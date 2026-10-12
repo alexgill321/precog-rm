@@ -1,0 +1,9 @@
+{
+  "price_train_per_tok": 4.012903613883746e-07,
+  "price_train_spread": [
+    4.000430862041031e-07,
+    4.01764666529166e-07
+  ],
+  "n_batches": 10,
+  "chars_per_token_conv": 3.2995980013094024
+}

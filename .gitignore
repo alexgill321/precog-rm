@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+paper/
+data/table1_data/*/
+data/ckpts/*
+data/grpo_rollouts/*
+!data/*/PLACEHOLDER.md
+logs/*/rollouts/
+*.ckpt
+*.pt

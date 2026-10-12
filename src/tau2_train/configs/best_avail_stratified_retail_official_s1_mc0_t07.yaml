@@ -1,0 +1,49 @@
+model_name: "Qwen/Qwen3-8B"
+lora_rank: 32
+renderer_name: "qwen3"
+
+learning_rate: 2.0e-5
+loss_fn: "ppo"
+loss_fn_config:
+  clip_low_threshold: 0.8
+  clip_high_threshold: 1.2
+num_substeps: 2
+
+group_size: 16
+batch_size: 20
+max_tokens: 2048
+temperature: 1.0
+max_turns: 100
+max_trajectory_tokens: 65536
+
+domains:
+  - "retail"
+task_split: "train"
+user_model: "gpt-4o-mini"
+
+seed: 1
+task_seed: 1
+num_batches: 50
+save_every: 1
+eval_every: 5
+eval_group_size: 3
+eval_task_split: "test"
+log_path: "logs/tau2_best_avail_strat_mc0_retail_official_s1_t07"
+run_name: "best_avail_strat_mc0_retail_official_s1_t07"
+save_rollouts: true
+use_action_reward: false
+
+# Variant: best_avail permanent support + NO 25%-completion floor.
+# min_completed=0 lets every rep in a group be early-stopped (the permanent
+# support ensures PRM is viable from batch 0), maximally aggressive ES.
+early_stop:
+  checkpoint_path: "exp/protonet/prefix_verify/model_prefix.pt"
+  threshold: 0.7
+  embedding_model: "text-embedding-3-large"
+  min_steps: 1
+  min_completed: 0
+  support_save_dir: "logs/tau2_best_avail_strat_mc0_retail_official_s1_t07/support_sets"
+  rolling_window: 3
+  min_class_support: 16
+  permanent_support_dir: "exp/tau2/baseline/consolidated_baselines"
+  n_permanent_per_task: 16

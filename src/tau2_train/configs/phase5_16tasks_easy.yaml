@@ -1,0 +1,42 @@
+model_name: "Qwen/Qwen3-8B"
+lora_rank: 32
+renderer_name: "qwen3"
+
+learning_rate: 2.0e-5
+loss_fn: "importance_sampling"
+num_substeps: 2
+
+group_size: 16
+batch_size: 4
+max_tokens: 2048
+temperature: 1.0
+max_turns: 100
+max_trajectory_tokens: 65536
+
+domains:
+  - "retail"
+task_ids:
+  - "69"
+  - "75"
+  - "40"
+  - "85"
+  - "2"
+  - "52"
+  - "24"
+  - "45"
+  - "77"
+  - "9"
+  - "26"
+  - "25"
+  - "15"
+  - "13"
+  - "17"
+  - "43"
+task_split: "base"
+user_model: "gpt-4o-mini"
+
+num_batches: 30
+save_every: 10
+log_path: "logs/tau2_phase5_16tasks_easy"
+run_name: "phase5_16tasks_easy"
+save_rollouts: true

@@ -1,0 +1,31 @@
+model_name: "Qwen/Qwen3-8B"
+lora_rank: 32
+renderer_name: "qwen3"
+
+learning_rate: 2.0e-5
+loss_fn: "importance_sampling"
+num_substeps: 2
+
+group_size: 16
+batch_size: 20
+max_tokens: 2048
+temperature: 1.0
+max_turns: 100
+max_trajectory_tokens: 65536
+
+domains:
+  - "retail"
+  - "airline"
+  - "telecom"
+task_split: "base"
+user_model: "gpt-4o-mini"
+
+num_batches: 30
+save_every: 1
+log_path: "logs/tau2_full_run_all_domains"
+run_name: "full_run_all_domains"
+save_rollouts: true
+
+gcs_bucket: null  # anonymized
+gcs_prefix: "flow_eval/tau2_grpo_rollouts"
+gcs_project: null  # anonymized

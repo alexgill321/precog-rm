@@ -1,0 +1,45 @@
+model_name: "Qwen/Qwen3-8B"
+lora_rank: 32
+renderer_name: "qwen3"
+
+learning_rate: 2.0e-5
+loss_fn: "ppo"
+loss_fn_config:
+  clip_low_threshold: 0.8
+  clip_high_threshold: 1.2
+num_substeps: 2
+
+group_size: 16
+batch_size: 20
+max_tokens: 2048
+temperature: 1.0
+max_turns: 100
+max_trajectory_tokens: 65536
+
+domains:
+  - "retail"
+task_split: null
+user_model: "gpt-4o-mini"
+
+seed: 3
+num_batches: 50
+save_every: 1
+eval_every: 5
+eval_group_size: 3
+eval_task_split: null
+log_path: "logs/tau2_early_stop_retail_s3"
+run_name: "early_stop_retail_s3"
+save_rollouts: true
+use_action_reward: false
+
+gcs_bucket: null  # anonymized
+gcs_prefix: "flow_eval/tau2_grpo_rollouts"
+gcs_project: null  # anonymized
+
+early_stop:
+  checkpoint_path: "exp/protonet/prefix_verify/model_prefix.pt"
+  threshold: 0.8
+  embedding_model: "text-embedding-3-large"
+  min_steps: 1
+  min_completed: 4
+  support_save_dir: "logs/tau2_early_stop_retail_s3/support_sets"

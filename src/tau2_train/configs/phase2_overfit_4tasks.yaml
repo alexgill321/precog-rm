@@ -1,0 +1,30 @@
+model_name: "Qwen/Qwen3-8B"
+lora_rank: 32
+renderer_name: "qwen3"
+
+learning_rate: 2.0e-5
+loss_fn: "importance_sampling"
+num_substeps: 2
+
+group_size: 8
+batch_size: 4
+max_tokens: 2048
+temperature: 1.0
+max_turns: 100
+max_trajectory_tokens: 65536
+
+domains:
+  - "retail"
+task_ids:
+  - "47"
+  - "17"
+  - "43"
+  - "95"
+task_split: "base"
+user_model: "gpt-4o-mini"
+
+num_batches: 15
+save_every: 5
+log_path: "logs/tau2_phase3_cookbook_4tasks"
+run_name: "phase3_cookbook_4tasks"
+save_rollouts: true

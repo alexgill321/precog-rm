@@ -3,11 +3,17 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
-paper/
-data/table1_data/*/
-data/ckpts/*
-data/grpo_rollouts/*
-!data/*/PLACEHOLDER.md
-logs/*/rollouts/
+# generated figures/tables
+paper/figures/
+paper/tables/
+# the data root (download with scripts/download.py); keep the layout docs and cards
+data/*
+!data/README.md
+!data/cards/
+exp/results/protonet_ablations/slim/
+exp/results/protonet_ablations/mmap/
+exp/results/protonet_ablations/ckpts/
+exp/results/protonet_ablations/traj_parts/
+exp/results/protonet_ablations/prefix_verify/
 *.ckpt
 *.pt

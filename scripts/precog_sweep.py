@@ -38,7 +38,7 @@ from src.prm.train_precog import PrecogProtoNet
 from sklearn.metrics import roc_auc_score
 import torch
 
-ABL = REPO / "exp/results/protonet_ablations"
+from scripts._paths import ABL, CKPT_PRECOG  # noqa: E402
 SEEDS = [0, 1, 2]
 K = 4
 
@@ -132,7 +132,7 @@ def main():
     ap.add_argument("--threads", type=int, default=0,
                     help="torch CPU thread cap per worker (recommend 4 for cpu workers)")
     ap.add_argument("--parts-dir", type=Path, default=ABL / "precog_parts")
-    ap.add_argument("--ckpt-dir", type=Path, default=ABL / "ckpts")
+    ap.add_argument("--ckpt-dir", type=Path, default=CKPT_PRECOG)
     args = ap.parse_args()
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
     if args.device != "auto":

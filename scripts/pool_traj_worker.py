@@ -48,10 +48,8 @@ _AC_SUBSET_FILES = {
 PROTO_KWARGS = dict(hidden_dim=128, n_heads=4, n_layers=2, ffn_dim=512, dropout=0.3,
                     epochs=10, lr=1e-4, k_support=4, q_query=4, episodes_per_epoch=400,
                     lambda_adv=0.0, no_pos=True)
-ABL_DIR = REPO / "exp/results/protonet_ablations"
-SLIM_DIR = ABL_DIR / "slim"
-MMAP_DIR = ABL_DIR / "mmap"
-SPLITS_PATH = ABL_DIR / "task_splits.json"
+from scripts._paths import ABL as ABL_DIR, SLIM_DIR, MMAP_DIR, SPLITS, CKPT_PRECOG  # noqa: E402
+SPLITS_PATH = SPLITS
 
 # minimal ablation registry (trajectories default to "full"; others available via --ablation)
 # NOTE: PrecogProtoNet defaults are no_pos=True and use_type_flag=False, so "full" here
@@ -367,7 +365,7 @@ def main():
                                                      "(default all 9)")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--parts-dir", type=Path, default=ABL_DIR / "traj_parts")
-    ap.add_argument("--ckpt-dir", type=Path, default=ABL_DIR / "ckpts")
+    ap.add_argument("--ckpt-dir", type=Path, default=CKPT_PRECOG)
     ap.add_argument("--traj-path", type=Path, default=ABL_DIR / "trajectories.json")
     args = ap.parse_args()
     args.cap = None if str(args.cap).lower() == "none" else int(args.cap)

@@ -26,7 +26,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.svm import SVC
 import torch
 
-ABL = REPO / "exp/results/protonet_ablations"
+from scripts._paths import ABL, CKPT_PRECOG  # noqa: E402
 OUT = ABL / "support_sweep.json"
 KS = [1, 2, 4, 8]
 REPEATS, SEED = 5, 42
@@ -82,7 +82,7 @@ def main():
             for s in SEEDS:
                 if s not in prms:
                     prms[s] = PrecogProtoNet.load(
-                        str(ABL / "ckpts" / f"precog_{ds.replace(':','_')}_g-q-d_s{s}.pt"))
+                        str(CKPT_PRECOG / f"precog_{ds.replace(':','_')}_g-q-d_s{s}.pt"))
             for t in cohort:
                 y = np.array([t["y"][r] for r in t["rids"]])
                 P = _san([t["pooled"][r] for r in t["rids"]])

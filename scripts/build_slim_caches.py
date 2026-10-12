@@ -6,16 +6,16 @@ embedding release and every PrecogRM experiment: for each (benchmark, model)
 cell it loads the step embeddings, forms the canonical per-task clustering
 (HDBSCAN over cosine of the concatenated [action|observation] step vector),
 keeps mixed-outcome tasks, and writes a compact float16 pickle to
-results/protonet_ablations/slim/<benchmark>_<model>.pkl.
+$PRECOG_DATA/caches/slim/<benchmark>_<model>.pkl.
 
 Afterwards, convert slim -> memory-mapped caches (what merged_cv_table.py and
 the sweep actually read):
 
     python scripts/pool_traj_worker.py --convert
 
-Expected data layout (the HuggingFace release, see data/table1_data/PLACEHOLDER.md):
+Expected data layout (the HuggingFace release, see data/README.md):
 
-    data/table1_data/<benchmark>_<model>/
+    $PRECOG_DATA/table1_data/<benchmark>_<model>/
         <task dirs with reward stubs>
         embeddings/action/<task>.npz
         embeddings/response/<task>.npz
@@ -43,9 +43,7 @@ sys.path.insert(0, str(REPO))
 from src.prm.cluster_sequence import load_all_tasks              # noqa: E402
 from src.prm.paired_action_response import hdbscan_cluster_affinity  # noqa: E402
 
-DATA_ROOT = REPO / "data" / "table1_data"
-ABL = REPO / "exp" / "results" / "protonet_ablations"
-SLIM_DIR = ABL / "slim"
+from scripts._paths import TABLE1 as DATA_ROOT, SLIM_DIR  # noqa: E402
 
 DATASETS = ["agentclinic", "bfclv3", "tau2"]
 MODELS = ["gpt5mini", "qwen", "deepseek"]

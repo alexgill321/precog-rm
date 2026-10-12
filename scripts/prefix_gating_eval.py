@@ -34,8 +34,8 @@ sys.path.insert(0, str(REPO))
 import scripts.pool_traj_worker as W                      # noqa: E402
 from src.prm.train_precog import PrecogProtoNet           # noqa: E402
 
-ABL = W.ABL_DIR
-CKPT_DIR = ABL / "ckpts"
+from scripts._paths import ABL, CKPT_PRECOG, CKPT_PREFIX  # noqa: E402
+CKPT_DIR = CKPT_PREFIX
 PREFIX_RES_PATH = ABL / "prefix_results.json"
 
 # ---- experiment config (identical to the notebook) ----
@@ -72,7 +72,7 @@ def train_or_load_prefix(pool, variant, test_labels, seed=PREFIX_SEED,
     if ckpt.exists():
         return PrecogProtoNet.load(str(ckpt))
     if variant == "full":   # identical config to the precog sweep -> reuse its ckpt
-        sweep = CKPT_DIR / f"precog_{pool.replace(':', '_').replace('+', '-')}_s{seed}.pt"
+        sweep = CKPT_PRECOG / f"precog_{pool.replace(':', '_').replace('+', '-')}_s{seed}.pt"
         if sweep.exists():
             print(f"  [reuse] {sweep.name}")
             return PrecogProtoNet.load(str(sweep))

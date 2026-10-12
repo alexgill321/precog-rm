@@ -1,0 +1,191 @@
+{
+  "0.55": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 12687,
+      "coverage": 1.0,
+      "early_accuracy": 0.6777804051391187,
+      "overall_accuracy": 0.6777804051391187,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1732407391,
+      "compute_saved": 0.7073966450044246,
+      "compute_saved_scored_only": 0.9489733296138528,
+      "total_steps": 225711,
+      "steps_saved": 206965,
+      "step_fraction_saved": 0.9169468922648873,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.24371403799164498,
+      "reward_mae": 0.3222195948608812,
+      "reward_bias": -0.05154882951052258
+    }
+  },
+  "0.6": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 12657,
+      "coverage": 0.9976353747930953,
+      "early_accuracy": 0.7087777514418898,
+      "overall_accuracy": 0.7094663829116419,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1669999197,
+      "compute_saved": 0.6819134086214962,
+      "compute_saved_scored_only": 0.9147875416963922,
+      "total_steps": 225711,
+      "steps_saved": 195917,
+      "step_fraction_saved": 0.8679993442942524,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.22132891936628044,
+      "reward_mae": 0.2905336170883582,
+      "reward_bias": -0.07393394813588713
+    }
+  },
+  "0.65": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 12555,
+      "coverage": 0.9895956490896193,
+      "early_accuracy": 0.7225806451612903,
+      "overall_accuracy": 0.7254670134783637,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1598434239,
+      "compute_saved": 0.6526911763382107,
+      "compute_saved_scored_only": 0.8755858869183357,
+      "total_steps": 225711,
+      "steps_saved": 184006,
+      "step_fraction_saved": 0.8152283229439415,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.24268936706865296,
+      "reward_mae": 0.2745329865216363,
+      "reward_bias": -0.05257350043351462
+    }
+  },
+  "0.7": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 12247,
+      "coverage": 0.965318830298731,
+      "early_accuracy": 0.7436923328161998,
+      "overall_accuracy": 0.7525813825175376,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1508518042,
+      "compute_saved": 0.6159755536620449,
+      "compute_saved_scored_only": 0.8263318411917985,
+      "total_steps": 225711,
+      "steps_saved": 171091,
+      "step_fraction_saved": 0.7580091355760242,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.2560889099077796,
+      "reward_mae": 0.24741861748246236,
+      "reward_bias": -0.03917395759438796
+    }
+  },
+  "0.75": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 11585,
+      "coverage": 0.9131394340663671,
+      "early_accuracy": 0.7625377643504532,
+      "overall_accuracy": 0.7831638685268385,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1379734531,
+      "compute_saved": 0.5633891792985044,
+      "compute_saved_scored_only": 0.755787165691143,
+      "total_steps": 225711,
+      "steps_saved": 153302,
+      "step_fraction_saved": 0.6791959629792079,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.27484826988255695,
+      "reward_mae": 0.2168361314731615,
+      "reward_bias": -0.020414597619610626
+    }
+  },
+  "0.8": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 10473,
+      "coverage": 0.8254906597304327,
+      "early_accuracy": 0.7822018523823164,
+      "overall_accuracy": 0.8202096634350122,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 1196767119,
+      "compute_saved": 0.48867780709682446,
+      "compute_saved_scored_only": 0.6555617827480211,
+      "total_steps": 225711,
+      "steps_saved": 130653,
+      "step_fraction_saved": 0.5788508313728618,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.2822574288641917,
+      "reward_mae": 0.17979033656498777,
+      "reward_bias": -0.013005438637975882
+    }
+  },
+  "0.85": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 8836,
+      "coverage": 0.696460944273666,
+      "early_accuracy": 0.8179040289723857,
+      "overall_accuracy": 0.8731772680696777,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 984314264,
+      "compute_saved": 0.40192659740482456,
+      "compute_saved_scored_only": 0.5391849453812962,
+      "total_steps": 225711,
+      "steps_saved": 105723,
+      "step_fraction_saved": 0.4683998564536066,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.2880901710412233,
+      "reward_mae": 0.12682273193032237,
+      "reward_bias": -0.007172696460944273
+    }
+  },
+  "0.9": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 6990,
+      "coverage": 0.5509576732087964,
+      "early_accuracy": 0.851931330472103,
+      "overall_accuracy": 0.9184204303617877,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 748078263,
+      "compute_saved": 0.3054639781590135,
+      "compute_saved_scored_only": 0.40978024207174346,
+      "total_steps": 225711,
+      "steps_saved": 80122,
+      "step_fraction_saved": 0.35497605344887934,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.28194214550327107,
+      "reward_mae": 0.08157956963821235,
+      "reward_bias": -0.013320721998896508
+    }
+  },
+  "0.95": {
+    "summary": {
+      "n_total": 12687,
+      "n_early": 3769,
+      "coverage": 0.2970757468274612,
+      "early_accuracy": 0.8949323427964977,
+      "overall_accuracy": 0.9687869472688578,
+      "baseline_prefill_tokens": 2448990115,
+      "scored_prefill_tokens": 1825559620,
+      "tokens_saved": 332776861,
+      "compute_saved": 0.13588330102345064,
+      "compute_saved_scored_only": 0.18228758861351238,
+      "total_steps": 225711,
+      "steps_saved": 36001,
+      "step_fraction_saved": 0.159500423107425,
+      "actual_mean_reward": 0.29526286750216757,
+      "effective_mean_reward": 0.28391266650902497,
+      "reward_mae": 0.031213052731142114,
+      "reward_bias": -0.011350200993142587
+    }
+  }
+}

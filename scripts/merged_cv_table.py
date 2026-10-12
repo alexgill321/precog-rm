@@ -28,7 +28,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold
 from sklearn.svm import SVC
 
-ABL = REPO / "exp/results/protonet_ablations"
+from scripts._paths import ABL, CKPT_PRECOG  # noqa: E402
 OUT = ABL / "merged_cv_table.json"
 N_FOLDS, SEED = 3, 42
 PN_SEEDS = [0, 1, 2]
@@ -41,7 +41,7 @@ def _san(P):
 def main():
     test_labels = {ds: set(v) for ds, v in json.load(open(W.SPLITS_PATH)).items()}
     W.load_all_cells()
-    prms = {s: PrecogProtoNet.load(str(ABL / "ckpts" / f"precog_{GENERALIST}_s{s}.pt"))
+    prms = {s: PrecogProtoNet.load(str(CKPT_PRECOG / f"precog_{GENERALIST}_s{s}.pt"))
             for s in PN_SEEDS}
     res = json.load(open(OUT)) if OUT.exists() else {}
 

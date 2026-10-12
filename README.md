@@ -21,10 +21,10 @@ checkpoints and GRPO logs.
 
 | HuggingFace repo | Contents | Size |
 |---|---|---|
-| `alexgill321/precog-rm-embeddings` | step embeddings for the 9 (benchmark, policy) cells, tau2 rollouts, reasoning embeddings, replay embeddings, optional mmap caches | 25 GB (+13 GB replay, +10 GB caches) |
-| `alexgill321/precog-rm-checkpoints` | 75 sweep checkpoints, design-study and prefix-trained encoders, the deployed GRPO controller | 0.5 GB |
-| `alexgill321/precog-rm-grpo-logs` | the 21 official GRPO runs (metrics, full rollouts, support sets), replay results, base-model eval | 35 GB |
-| `alexgill321/precog-rm-rollouts` | raw BFCLv3 and AgentClinic trajectories, no-tools ablation, final-diagnosis resamples, task lists | 5 GB |
+| `agill32/precog-rm-embeddings` | step embeddings for the 9 (benchmark, policy) cells, tau2 rollouts, reasoning embeddings, replay embeddings, optional mmap caches | 25 GB (+13 GB replay, +10 GB caches) |
+| `agill32/precog-rm-checkpoints` | 75 sweep checkpoints, design-study and prefix-trained encoders, the deployed GRPO controller | 0.5 GB |
+| `agill32/precog-rm-grpo-logs` | the 21 official GRPO runs (metrics, full rollouts, support sets), replay results, base-model eval | 35 GB |
+| `agill32/precog-rm-rollouts` | raw BFCLv3 and AgentClinic trajectories, no-tools ablation, final-diagnosis resamples, task lists | 5 GB |
 
 ```bash
 pip install -r requirements.txt

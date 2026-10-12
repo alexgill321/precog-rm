@@ -17,7 +17,7 @@ import argparse
 
 from _paths import DATA
 
-ORG = "alexgill321"
+ORG = "agill32"
 REPOS = {
     "embeddings": (f"{ORG}/precog-rm-embeddings", "dataset"),
     "caches": (f"{ORG}/precog-rm-embeddings", "dataset"),

@@ -97,6 +97,8 @@ def materialize(src: Path, dst: Path, data_root: Path):
     directories become tarballs (tar_rule)."""
     for root, dirs, files in os.walk(src, followlinks=True):
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+        if Path(os.path.relpath(root, data_root)).parts == ("caches",):
+            dirs[:] = [d for d in dirs if d != "slim"]      # intermediate; mmap is what ships
         rel = Path(root).relative_to(src)
         (dst / rel).mkdir(parents=True, exist_ok=True)
         rel_data = Path(os.path.relpath(root, data_root))   # path relative to the data root

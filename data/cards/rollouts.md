@@ -8,7 +8,7 @@ size_categories: [1B<n<10B]
 # Precog-RM raw rollouts
 
 Raw agent trajectories behind *"Divergent Paths: Learning an Outcome-Predictive
-Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzman), for re-embedding,
+Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzmán), for re-embedding,
 inspection, and the AgentClinic analyses of Appendix I.
 Code: https://github.com/alexgill321/precog-rm
 

@@ -9,7 +9,7 @@ size_categories: [10B<n<100B]
 # Precog-RM embedding corpora
 
 Step-level embeddings of agent trajectories used in *"Divergent Paths: Learning an
-Outcome-Predictive Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzman).
+Outcome-Predictive Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzmán).
 Code: https://github.com/alexgill321/precog-rm
 
 Nine (benchmark, policy) cells: {Tau2-Bench, BFCLv3, AgentClinic MedQA-Extended} x

@@ -8,7 +8,7 @@ size_categories: [10B<n<100B]
 # Precog-RM GRPO training logs
 
 The 21 official GRPO runs behind Section 5 of *"Divergent Paths: Learning an
-Outcome-Predictive Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzman):
+Outcome-Predictive Representation of LLM Agent Trajectories"* (Gill, Gogia, Guzmán):
 Qwen3-8B (LoRA r=32) on the official tau2-bench retail train split, group size 16,
 20 tasks per batch, three seeds per configuration, with and without the Precog-RM
 early-stopping controller. Code: https://github.com/alexgill321/precog-rm

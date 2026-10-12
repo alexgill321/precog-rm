@@ -51,7 +51,7 @@ policies) is shipped and must not be regenerated.
 
 | Result | (A) shipped | (B) recompute | Status |
 |---|---|---|---|
-| App. B tab:channel (9 cells x 4 channels) | `python scripts/q4_channel_ablation.py` (prints from `channel_ablation.json`) | same with `--force` (~3 h) | raw exact; clustered ±0.01 |
+| App. B tab:channel (9 cells x 4 channels) | `python scripts/q4_channel_ablation.py --print-only` | `python scripts/q4_channel_ablation.py --force` (~1.5 h) | raw exact (all 36 values); clustered ±0.005 on Tau2/BFCL, ±0.02 on the 13-task AgentClinic cells |
 | App. B.1 tab:reasoning | `python scripts/reasoning_signal_ablation.py` | `--embed` to re-embed reasoning (`OPENAI_API_KEY`, ~$6) | raw exact; clustered ±0.01 |
 | App. C tab:ablations, mixed-pool replication | `python scripts/design_study.py` | `--eval` re-scores shipped checkpoints; `--train` retrains (~20 min each) | exact (A) |
 | App. E tab:pool-sizes, App. D counts | `python scripts/dataset_stats.py` | same | exact |

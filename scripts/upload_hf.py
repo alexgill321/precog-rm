@@ -38,7 +38,8 @@ EXCLUDE_FILE = re.compile(r"^\.env(\..*)?$|^\.DS_Store$|\.(pem|key|p12)$|credent
 SECRET_PAT = re.compile(rb"sk-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{20,}|tinker_[A-Za-z0-9_-]{10,}|tk-[A-Za-z0-9_-]{16,}"
                         rb"|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}"
                         rb"|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|\"private_key\"|sk-or-v1-[a-f0-9]{20,}"
-                        rb"|API_KEY *[=:] *[\"']?[A-Za-z0-9][A-Za-z0-9_-]{15,}|Bearer [A-Za-z0-9._-]{20,}")
+                        rb"|API_KEY *[=:] *[\"']?[A-Za-z0-9][A-Za-z0-9_-]{15,}"
+                        rb"|Bearer (?=[A-Za-z0-9._-]*[a-z0-9])[A-Za-z0-9._-]{20,}")   # skips ALL-CAPS placeholders
 TEXT_EXT = {".json", ".jsonl", ".txt", ".log", ".yaml", ".yml", ".csv", ".md", ".cfg", ".ini", ".toml", ".py", ".sh"}
 
 

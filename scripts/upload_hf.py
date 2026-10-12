@@ -57,14 +57,63 @@ def scan_secrets(root: Path, max_bytes=50 * 2**20):
         raise SystemExit("REFUSING TO UPLOAD: credential-like content in\n  " + "\n  ".join(map(str, hits)))
 
 
-def materialize(src: Path, dst: Path):
+def tar_rule(rel: Path):
+    """Directories with tens of thousands of small files are shipped as one
+    tarball each (the Hub commits ~75 small files at a time and caps commits per
+    hour). Returns (tar name, members) when `rel` (relative to the data root)
+    should be tarred, else None. download.py extracts them in place.
+
+      rollouts/raw/<benchmark>/<model>        -> rollouts/raw/<benchmark>/<model>.tar.gz
+      table1_data/<cell>/<non-embeddings dir> -> table1_data/<cell>/records.tar.gz (all such dirs)
+      grpo_replay/<seed>/data                 -> grpo_replay/<seed>/data.tar.gz
+    """
+    p = rel.parts
+    if len(p) == 4 and p[:2] == ("rollouts", "raw"):
+        return rel.name + ".tar.gz", None
+    if len(p) == 3 and p[0] == "grpo_replay" and p[2] == "data":
+        return "data.tar.gz", None
+    return None
+
+
+def make_tar(src_dir: Path, out: Path, members=None):
+    """tar -czf following symlinks, without credential files / scratch dirs."""
+    import subprocess
+    if out.exists():
+        return
+    cmd = ["tar", "-czhf", str(out)]
+    for d in EXCLUDE_DIRS:
+        cmd += ["--exclude", d]
+    for pat in (".env", ".env.*", ".DS_Store"):
+        cmd += ["--exclude", pat]
+    cmd += ["-C", str(src_dir.parent), src_dir.name] if members is None else ["-C", str(src_dir), *members]
+    print(f"    tar {out.name} <- {src_dir}", flush=True)
+    subprocess.run(cmd, check=True)
+
+
+def materialize(src: Path, dst: Path, data_root: Path):
     """Copy a (possibly symlinked) tree into dst following links; big files are
     hard-linked when on the same volume, else copied. Credential files and
-    scratch directories are skipped (EXCLUDE_DIRS / EXCLUDE_FILE)."""
+    scratch directories are skipped (EXCLUDE_DIRS / EXCLUDE_FILE); file-heavy
+    directories become tarballs (tar_rule)."""
     for root, dirs, files in os.walk(src, followlinks=True):
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
         rel = Path(root).relative_to(src)
         (dst / rel).mkdir(parents=True, exist_ok=True)
+        rel_data = Path(os.path.relpath(root, data_root))   # path relative to the data root
+        # table1_data/<cell>: tar every non-embeddings directory into records.tar.gz
+        if len(rel_data.parts) == 2 and rel_data.parts[0] == "table1_data":
+            record_dirs = sorted(d for d in dirs if d != "embeddings")
+            if record_dirs:
+                make_tar(Path(root), dst / rel / "records.tar.gz", members=record_dirs)
+            dirs[:] = [d for d in dirs if d == "embeddings"]
+        keep = []
+        for d in dirs:
+            rule = tar_rule(rel_data / d)
+            if rule:
+                make_tar(Path(root) / d, dst / rel / rule[0], rule[1])
+            else:
+                keep.append(d)
+        dirs[:] = keep
         for f in files:
             if EXCLUDE_FILE.search(f):
                 continue
@@ -83,24 +132,28 @@ def main():
     ap.add_argument("--stage", nargs="+", choices=list(STAGE_DIRS), required=True)
     ap.add_argument("--staging", default=None, help="scratch dir for the materialized tree (default: temp)")
     ap.add_argument("--public", action="store_true", help="create repos public (default private)")
+    ap.add_argument("--dry-run", action="store_true", help="materialize + secret scan only, no upload")
     args = ap.parse_args()
     from huggingface_hub import HfApi
     api = HfApi()
     for st in args.stage:
         repo, kind = REPOS[st]
-        api.create_repo(repo, repo_type=kind, private=not args.public, exist_ok=True)
+        if not args.dry_run:
+            api.create_repo(repo, repo_type=kind, private=not args.public, exist_ok=True)
         stage_root = Path(args.staging or tempfile.mkdtemp(prefix="precog_upload_")) / st
         for sub in STAGE_DIRS[st]:
             src = DATA / sub
             if not src.exists():
                 print(f"  [skip] {src} missing"); continue
             print(f"  materializing {sub} ...", flush=True)
-            materialize(src, stage_root / sub)
+            materialize(src, stage_root / sub, DATA)
         card = CARDS / f"{st}.md"
         if card.exists():
             shutil.copy2(card, stage_root / "README.md")
         print(f"[{st}] scanning {stage_root} for credentials ...", flush=True)
         scan_secrets(stage_root)
+        if args.dry_run:
+            n = sum(1 for _ in stage_root.rglob("*") if _.is_file()); print(f"[{st}] dry run: {n} files staged at {stage_root}"); continue
         print(f"[{st}] uploading {stage_root} -> {repo} ({kind})", flush=True)
         api.upload_large_folder(repo_id=repo, repo_type=kind, folder_path=str(stage_root))
         print(f"[{st}] done: https://huggingface.co/{'datasets/' if kind == 'dataset' else ''}{repo}")

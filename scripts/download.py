@@ -58,7 +58,23 @@ def main():
                 pats.remove("grpo_replay/**")
         print(f"[{st}] {repo} -> {DATA}  patterns={pats}", flush=True)
         snapshot_download(repo_id=repo, repo_type=kind, local_dir=str(DATA), allow_patterns=pats)
+    extract_tarballs(DATA)
     print("done:", DATA)
+
+
+def extract_tarballs(root):
+    """File-heavy directories ship as tarballs (see scripts/upload_hf.py:tar_rule);
+    extract each next to itself once, then drop the archive."""
+    import tarfile
+    for tar in sorted(root.rglob("*.tar.gz")):
+        marker = tar.with_suffix("").with_suffix(".extracted")
+        if marker.exists():
+            continue
+        print(f"  extracting {tar.relative_to(root)}", flush=True)
+        with tarfile.open(tar) as tf:
+            tf.extractall(tar.parent, filter="data")
+        marker.write_text("ok\n")
+        tar.unlink()
 
 
 if __name__ == "__main__":

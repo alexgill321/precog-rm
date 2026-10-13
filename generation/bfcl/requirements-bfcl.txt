@@ -1,0 +1,6 @@
+# bfcl-eval pins numpy==1.26.x, which conflicts with flow_eval's numpy 2.x lockfile.
+# Use a dedicated venv for BFCL runs, e.g.:
+#   cd projects/flow_eval && python3.11 -m venv .venv_bfcl && source .venv_bfcl/bin/activate
+#   pip install -r exp/bfcl/requirements-bfcl.txt
+bfcl-eval==2026.3.23
+soundfile>=0.13.0

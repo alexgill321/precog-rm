@@ -16,6 +16,9 @@ release on HuggingFace.** `REPLICATION.md` maps each table, figure and quoted
 number to a command, with two paths: the shipped per-task outputs (seconds, no
 download) and a full recompute from the released trajectories, embeddings,
 checkpoints and GRPO logs.
+`GENERATION.md` covers the layer before that: generating the rollouts with
+the three policies, screening tasks, and embedding step texts into the released
+layout (`generation/`), for anyone who wants to rebuild the corpora from scratch.
 
 ## Data release
 
@@ -59,6 +62,7 @@ python scripts/prefix_gating_eval.py --train && python scripts/fig_prefix_gated.
 
 ```
 scripts/        one driver per paper result (see REPLICATION.md); _paths.py resolves the data root
+generation/     rollout generation + embedding: tau2 runner, BFCL wrapper, AgentClinic harness (GENERATION.md)
 src/prm/        Precog-RM model + episodic training (train_precog.py), state clustering
                 (paired_action_response.py, cluster_sequence.py, thought_dag.py), text extraction (embeddings.py)
 src/tau2_train/ GRPO training loop (grpo.py, train.py), early-stopping controller (early_stopping.py,

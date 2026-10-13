@@ -22,6 +22,9 @@ layout (`generation/`), for anyone who wants to rebuild the corpora from scratch
 
 ## Data release
 
+All four repos are grouped in the HuggingFace collection
+[Precog-RM](https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8).
+
 | HuggingFace repo | Contents | Size |
 |---|---|---|
 | `agill32/precog-rm-embeddings` | step embeddings for the 9 (benchmark, policy) cells, tau2 rollouts, reasoning embeddings, replay embeddings, optional mmap caches | 25 GB (+13 GB replay, +10 GB caches) |

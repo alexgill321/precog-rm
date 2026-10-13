@@ -7,7 +7,7 @@
 #
 # Requires: tau2-bench (sierra-research/tau2-bench @ c5b2d22) importable as `tau2`
 # or TAU2_BENCH_SRC pointing at its src/; OPENAI_API_KEY for the gpt-4o-mini user
-# simulator and NL judge (LiteLLM); $PRECOG_DATA/rollouts/meta/tau2_task_ids.json.
+# simulator and NL judge (LiteLLM); $PRECOG_DATA/meta/tau2_task_ids.json.
 # Resumable: existing rollouts in the cell are seeded into the staging dir first.
 set -euo pipefail
 MODEL="${1:?model id}"
@@ -36,7 +36,7 @@ $PY -m generation.tau2.runner \
   --domain all --model "$MODEL" "${EXTRA[@]}" \
   --user-model gpt-4o-mini \
   --Z 50 --N 1 --temperature 1.0 --max-steps 100 --max-errors 10 \
-  --task-split base --task-file "$PRECOG_DATA/rollouts/meta/tau2_task_ids.json" \
+  --task-split base --task-file "$PRECOG_DATA/meta/tau2_task_ids.json" \
   --selection-strategy random --seed 42 --max-concurrency "${CONCURRENCY:-20}" \
   --output-dir "$STAGING"
 

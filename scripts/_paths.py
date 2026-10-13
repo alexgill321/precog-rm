@@ -6,7 +6,7 @@ data root; everything small that the paper's aggregation scripts read or write
 "no data needed" fast path keeps working.
 
     PRECOG_DATA   data root (default: <repo>/data). Populate it with
-                  `python scripts/download.py --stage ...` or point it at a
+                  `python scripts/download.py --part ...` or point it at a
                   directory with the layout documented in data/README.md.
 """
 import os
@@ -28,12 +28,12 @@ CKPTS = DATA / "ckpts"                 # precog/, ablations/, prefix/
 CKPT_PRECOG = CKPTS / "precog"
 CKPT_ABL = CKPTS / "ablations"
 CKPT_PREFIX = CKPTS / "prefix"
-RUNS = DATA / "runs"                   # 21 official GRPO runs
-REPLAY = DATA / "replay"               # simulated early-stopping results_*.json
-GRPO_REPLAY = DATA / "grpo_replay"     # baseline-run rollouts + embeddings for replay
-EVAL = DATA / "eval"                   # base-model test-split eval
-REASONING_EMB = DATA / "reasoning_emb"
-ROLLOUTS = DATA / "rollouts"           # raw/, resample/, meta/
+RUNS = DATA / "grpo" / "runs"          # 21 official GRPO runs
+REPLAY = DATA / "grpo" / "replay"      # simulated early-stopping results_*.json
+EVAL = DATA / "grpo" / "eval"          # base-model test-split eval
+GRPO_REPLAY = DATA / "embeddings" / "grpo_replay"   # baseline-run rollouts + embeddings for replay
+REASONING_EMB = DATA / "embeddings" / "reasoning"   # per-step reasoning embeddings (tau2/qwen)
+ROLLOUTS = DATA / "rollouts"           # <benchmark>/<policy>/<task>/rollout_NNN.json
 
 # ---- small, shipped in the repo ----
 ABL = REPO / "exp" / "results" / "protonet_ablations"   # result JSONs + precog_parts
@@ -45,6 +45,12 @@ AC_META = REPO / "benchmark_refs" / "AgentClinic"        # tool-reliance lists
 
 DATASETS = ["agentclinic", "bfclv3", "tau2"]
 MODELS = ["gpt5mini", "qwen", "deepseek"]
+# internal model key -> folder name in the public release
+POLICY_DIR = {"gpt5mini": "gpt5mini", "qwen": "qwen3-80b", "deepseek": "deepseek-v3.2"}
+# public-release locations (mirrors the HuggingFace layout, see data/README.md)
+GRPO = DATA / "grpo"
+ABLATIONS = DATA / "ablations"
+META = DATA / "meta"
 BENCH_NAME = {"tau2": "Tau2-Bench", "bfclv3": "BFCLv3", "agentclinic": "AgentClinic"}
 MODEL_NAME = {"deepseek": "DS-V3.2", "qwen": "Qwen3-80B", "gpt5mini": "GPT-5-mini"}
 
@@ -52,6 +58,6 @@ MODEL_NAME = {"deepseek": "DS-V3.2", "qwen": "Qwen3-80B", "gpt5mini": "GPT-5-min
 def require(path: Path, what: str, stage: str) -> Path:
     if not path.exists():
         raise SystemExit(f"missing {what}: {path}\n"
-                         f"  -> run `python scripts/download.py --stage {stage}` "
+                         f"  -> run `python scripts/download.py --part {stage}` "
                          f"or set PRECOG_DATA (currently {DATA})")
     return path

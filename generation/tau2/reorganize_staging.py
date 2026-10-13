@@ -5,7 +5,7 @@ The runner writes `<staging>/<domain>/<task>_tdp_<NN>.json`. The release layout
 (what every loader reads) is `<cell>/<domain>/<idx>/rollout_<NNN>.json`, where
 `idx` is the task's position-stable index: airline/retail tasks keep their
 numeric id, telecom tasks (long descriptive ids) are mapped through
-rollouts/meta/tau2_telecom_id_mapping.json. Also works in reverse (--seed) to
+meta/tau2_telecom_id_mapping.json. Also works in reverse (--seed) to
 pre-populate a staging dir from an existing cell so the runner resumes.
 
     python -m generation.tau2.reorganize_staging --staging rollouts/tau2/_staging --cell $PRECOG_DATA/table1_data/tau2_deepseek
@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = Path(os.environ.get("PRECOG_DATA", REPO / "data"))
-TELECOM_MAP = DATA / "rollouts" / "meta" / "tau2_telecom_id_mapping.json"
+TELECOM_MAP = DATA / "meta" / "tau2_telecom_id_mapping.json"
 
 
 def mappings():

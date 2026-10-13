@@ -16,9 +16,9 @@ Values marked *exact* reproduce the shipped JSON bit-for-bit under (B); values
 marked *±0.01* depend on fastText, which trains multi-threaded without a seed.
 
 ```
-python scripts/download.py --stage checkpoints caches        # 11 GB: everything except retraining + raw data
-python scripts/download.py --stage embeddings                 # 38 GB: raw embeddings (rebuild caches yourself)
-python scripts/download.py --stage grpo rollouts              # 40 GB: GRPO logs, raw trajectories
+python scripts/download.py --part checkpoints caches        # 11 GB: everything except retraining + raw data
+python scripts/download.py --part embeddings                 # 38 GB: raw embeddings (rebuild caches yourself)
+python scripts/download.py --part grpo rollouts              # 40 GB: GRPO logs, raw trajectories
 ```
 
 ---

@@ -13,7 +13,7 @@ help:
 	@echo "  all             everything above that does not retrain (needs download-eval + grpo + rollouts)"
 
 download-eval:
-	$(PY) scripts/download.py --stage checkpoints caches
+	$(PY) scripts/download.py --part checkpoints caches
 download-all:
 	$(PY) scripts/download.py --all
 

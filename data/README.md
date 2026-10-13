@@ -1,54 +1,50 @@
 # Data root layout
 
 Everything large lives under one data root, `$PRECOG_DATA` (default: this
-directory). Fill it with `python scripts/download.py --stage ...` or point
-`PRECOG_DATA` at a directory with this layout. Each stage is an entry point
-into the pipeline; nothing here is required for the "shipped results" fast
-path (`print_table1.py`, `aggregate_generalization.py --check`, `table_grpo.py`
-read small JSONs and caches that live in the repo).
+directory). `python scripts/download.py --part ...` fills it from the
+HuggingFace release (dataset `agill32/precog-rm`, model `agill32/precog-rm-checkpoints`)
+and then builds the `table1_data/` view the loaders read. Nothing here is
+needed for the "shipped results" fast path (`print_table1.py`,
+`aggregate_generalization.py --check`, `table_grpo.py`, ... read small JSONs
+and caches that live in the repo).
+
+Benchmarks: `tau2`, `bfclv3`, `agentclinic`. Policy folders: `gpt5mini`,
+`qwen3-80b`, `deepseek-v3.2` (the code's internal keys are `gpt5mini`,
+`qwen`, `deepseek`; `scripts/_paths.py:POLICY_DIR` maps them).
 
 ```
 $PRECOG_DATA/
-  table1_data/<benchmark>_<model>/        9 embedding corpora (layer 1, ~25 GB total)
-      benchmark in {tau2, bfclv3, agentclinic}, model in {gpt5mini, qwen, deepseek}
-      embeddings/action/<task>.npz        keys r<rid>_s<step>, float32 (3072,)  text-embedding-3-large
-      embeddings/response/<task>.npz      same keys; observation embeddings
-      <category>/<task>_tdp_<rid>.json    reward stubs (bfclv3, agentclinic)
-      <domain>/<idx>/rollout_<rid>.json   FULL rollouts incl. messages (tau2 cells)
-      manifest.json                       tau2_qwen only: per-rollout rewards/sources (consolidated set)
-  reasoning_emb/tau2_qwen_steps/<task>.npz   per-step reasoning embeddings, tau2/qwen test tasks (App. B.1)
-  grpo_replay/official_retail_s{1,2,3}/   baseline-GRPO rollouts embedded per batch-task (replay simulation)
-      data/batch_<b>_retail_<task>.json   per-turn prefill token counts, rewards
-      embeddings/{action,response}/*.npz
-  caches/
-      slim/<benchmark>_<model>.pkl        intermediate (optional; built by build_slim_caches.py)
-      mmap/<benchmark>_<model>_{act,res,pooled}.npy + _meta.pkl   what every experiment reads
-      task_splits.json                    (copy; the canonical file is exp/results/protonet_ablations/)
-  ckpts/
-      precog/precog_<pool>_s<seed>.pt     75 sweep checkpoints: <benchmark>_<g|q|d combos>, two- and
-                                          three-benchmark pools as <b1>-<b2>[-<b3>]_all; seeds 0-2
-      ablations/src_<name>_s0.pt, mix_<name>_s0.pt, pool_<pool>_full_s0.pt   design study (App. C/F)
-      prefix/prefix_<pool>_<variant>_s0.pt                                    prefix-trained encoders (Sec. 4.5)
-      prefix/grpo_controller_model_prefix.pt                                  the controller deployed in GRPO
-  runs/<run_name>/                        21 official GRPO runs (~35 GB)
-      metrics.jsonl                       per-batch metrics incl. "eval" rows every 5 batches
-      rollouts/batch_<b>.jsonl            full rollout records (conversation, tokens, PRM scores)
-      support_sets/                       early-stop runs only
-  replay/results_<config>_s<seed>.json    simulated early stopping over the baseline seeds (App. M)
-  eval/eval_base_qwen3_8b_test.json       base model on the official test split (20.8%)
-  rollouts/
-      raw/bfclv3/<model>/<category>/<task>/rollout_<rid>/{result,score}/   BFCL runs
-      raw/agentclinic/<model>/scenario_<sid>_rollout_<rid>.json           MedQA-Ext, 50 rollouts
-      raw/agentclinic/gpt56terra/                                         9 scenarios x 50 (App. I)
-      raw/agentclinic_notools/<model>/                                    no-tools ablation, 25 rollouts
-      resample/<model>.json                                               final-diagnosis resamples (App. I)
-      meta/toolreliant_*.txt, nontool_*.txt, tau2_task_ids.json, bfclv3_mixed_200_tasks.json
+  rollouts/<benchmark>/<policy>/<task>/      raw trajectories (public layout, one JSON per rollout)
+      rollout_NNN.json                       envelope: benchmark, policy, task, rid, reward, n_steps,
+                                             steps=[{action, observation}] (embedding order), raw={harness record}
+      extra_rollouts.jsonl                   surplus rollouts beyond the 50 the paper used (tau2/qwen3-80b)
+      task.json                              task id, category/domain, success rate, source run
+  embeddings/<benchmark>/<policy>/<task>/    action.npz, observation.npz (keys r<rid>_s<step>), rewards.json
+  embeddings/reasoning/tau2_qwen_steps/      per-step reasoning embeddings (App. B.1)
+  embeddings/grpo_replay/official_retail_s{1,2,3}/   baseline-GRPO rollouts embedded per batch (App. M)
+  grpo/runs/<run_name>/                      21 official GRPO runs: metrics.jsonl, rollouts/batch_*.jsonl, support_sets/
+  grpo/replay/results_<config>_s<seed>.json  simulated early stopping
+  grpo/eval/eval_base_qwen3_8b_test.json     base model on the official test split
+  caches/mmap/, caches/task_splits.json      optional float16 fast path (what every experiment reads)
+  ablations/agentclinic/notools/<policy>/    no-tools ablation rollouts (25 per scenario)
+  ablations/agentclinic/resample/<policy>.json   final-diagnosis resamples
+  ablations/agentclinic/terra/               GPT-5.6-Terra reference rollouts
+  meta/                                      tau2_task_ids.json, tau2_telecom_id_mapping.json,
+                                             bfclv3_mixed_200_tasks.json, toolreliant_*.txt, nontool_*.txt
+  ckpts/precog/, ckpts/ablations/, ckpts/prefix/   checkpoints (download.py re-folders the model repo)
+
+  table1_data/<benchmark>_<model>/           DERIVED by download.py --materialize-only from embeddings/:
+      embeddings/{action,response}/<task>.npz    hard links
+      <category>/<id>_tdp_<rid>.json             reward stubs
+      manifest.json                              tau2_qwen only
 ```
 
 Run names: `tau2_baseline_retail_official_s{1,2,3}` (100 batches),
 `tau2_early_stop_retail_official_s{1,2,3}[_t07][_mc0_t07][_mc0_t065]`,
 `tau2_best_avail_strat_mc0_retail_official_s{1,2,3}[_t07]` (50 batches).
 
-Raw tau2 rollouts for the three policies are inside their `table1_data` cells
-(the tau2 corpora were never repacked into stubs). The tau2/qwen cell holds
-more than 50 rollouts for many tasks; every loader caps at the first 50.
+Provenance of each cell (verified against the caches the paper's results were
+computed from) is in `docs/HF_LAYOUT_PLAN.md` and in every `task.json`. Two
+tau2/qwen3-80b tasks (`retail_31`, `retail_42`) ship rollouts but no embeddings:
+their source embeddings had drifted from the rollout files and neither task
+enters any result (both are degenerate under the 50-rollout subsample).

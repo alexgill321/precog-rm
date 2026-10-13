@@ -34,7 +34,7 @@ All four repos are grouped in the HuggingFace collection
 
 ```bash
 pip install -r requirements.txt
-python scripts/download.py --stage checkpoints caches      # enough for every evaluation
+python scripts/download.py --part checkpoints caches      # enough for every evaluation
 python scripts/download.py --all                           # everything
 ```
 
@@ -50,7 +50,7 @@ python scripts/aggregate_generalization.py     # Table 2, App. J
 python scripts/table_grpo.py                   # Table 3, App. K
 python scripts/design_study.py                 # App. C, F
 
-# full pipeline (after download --stage embeddings checkpoints)
+# full pipeline (after download --part embeddings checkpoints)
 python scripts/build_slim_caches.py && python scripts/pool_traj_worker.py --convert
 python scripts/merged_cv_table.py && python scripts/print_table1.py
 python scripts/precog_sweep.py                 # 25 pools x 3 seeds

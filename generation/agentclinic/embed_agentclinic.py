@@ -43,7 +43,7 @@ sys.path.insert(0, str(REPO))
 from src.prm.embeddings import task_id_to_filename  # noqa: E402
 
 DATA = Path(os.environ.get("PRECOG_DATA", REPO / "data"))
-AC_RAW = DATA / "rollouts" / "raw"                     # raw/agentclinic/<model>/, raw/agentclinic_notools/<model>/
+AC_RAW = DATA / "rollouts"                             # rollouts/agentclinic/<policy>/<scenario>/rollout_NN.json (public layout)
 OUT_ROOT = DATA / "agentclinic_embeddings"
 
 MODEL = "text-embedding-3-large"
@@ -56,7 +56,7 @@ _DOCTOR_ROLE = "doctor"
 
 SOURCES = {
     "deepseek_medqa": {
-        "rollouts_dir": AC_RAW / "agentclinic" / "deepseek",
+        "rollouts_dir": AC_RAW / "agentclinic" / "deepseek-v3.2",
         "model": "vertex-deepseek-v3.2",
         "dataset": "MedQA_Ext",
     },
@@ -69,12 +69,12 @@ SOURCES = {
     # `content`), which the extraction below never reads — embeddings cover
     # only the spoken utterance / extracted action, same as other sources.
     "qwen_medqa": {
-        "rollouts_dir": AC_RAW / "agentclinic" / "qwen",
+        "rollouts_dir": AC_RAW / "agentclinic" / "qwen3-80b",
         "model": "vertex-qwen3-80b",
         "dataset": "MedQA_Ext",
     },
     "gpt56terra_medqa": {
-        "rollouts_dir": AC_RAW / "agentclinic" / "gpt56terra",
+        "rollouts_dir": AC_RAW / "agentclinic" / "gpt5.6-terra",
         "model": "gpt-5.6-terra",
         "dataset": "MedQA_Ext",
     },

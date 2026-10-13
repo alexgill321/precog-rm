@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Appendix I (tab:ac-resample): final-diagnosis resampling on AgentClinic.
 
-Reads $PRECOG_DATA/rollouts/resample/<policy>.json, written by
+Reads $PRECOG_DATA/ablations/agentclinic/resample/<policy>.json, written by
 benchmark_refs/AgentClinic/resample_diagnosis.py: for each selected rollout the
 doctor's context up to (excluding) its final DIAGNOSIS turn is replayed and the
 diagnosis resampled 10 times from the same policy; each resample is graded by
@@ -22,10 +22,10 @@ import json
 
 import numpy as np
 
-from _paths import ROLLOUTS, require
+from _paths import ABLATIONS, require
 
-POLICIES = [("deepseek", "DeepSeek-V3.2"), ("qwen", "Qwen3-Next-80B-Thinking"),
-            ("gpt5mini", "GPT-5-mini"), ("gpt56terra", "GPT-5.6-Terra")]
+POLICIES = [("deepseek-v3.2", "DeepSeek-V3.2"), ("qwen3-80b", "Qwen3-Next-80B-Thinking"),
+            ("gpt5mini", "GPT-5-mini"), ("gpt5.6-terra", "GPT-5.6-Terra")]
 
 
 def auroc_ceiling(ps):
@@ -55,7 +55,7 @@ def summarize(path):
 
 
 def main():
-    d = require(ROLLOUTS / "resample", "resample JSONs", "rollouts")
+    d = require(ABLATIONS / "agentclinic" / "resample", "resample JSONs", "ablations")
     print(f"{'policy':26} {'rollouts':>8} {'tasks':>5} {'Cons.':>6} {'Ambig.':>6} {'AUROC ceil.':>11}")
     for key, name in POLICIES:
         p = d / f"{key}.json"

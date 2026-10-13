@@ -3,7 +3,7 @@
 
 For each policy, every mixed-outcome MedQA-Extended scenario was re-run with a
 doctor prompt stripped of the ability to order tests (25 rollouts; raw records
-under $PRECOG_DATA/rollouts/raw/agentclinic_notools/<policy>/). A scenario is
+under $PRECOG_DATA/ablations/agentclinic/notools/<policy>/). A scenario is
 tool-reliant if its success rate drops by more than 0.1 without tools: one-sided
 Farrington-Manning score test of H1: SR_with - SR_without > 0.1 against the
 with-tools 50-rollout baseline, Benjamini-Hochberg FDR 5% within each policy.
@@ -25,7 +25,7 @@ import numpy as np
 from scipy.optimize import minimize_scalar
 from scipy.stats import norm
 
-from _paths import ROLLOUTS, TABLE1, AC_META, MODEL_NAME, require
+from _paths import ABLATIONS, TABLE1, AC_META, MODEL_NAME, POLICY_DIR, require
 
 SR_LO, SR_HI, MARGIN, FDR = 0.16, 0.84, 0.10, 0.05
 LABEL_FILES = {"gpt5mini": ("toolreliant_26.txt", "nontool_mixed.txt"),
@@ -63,7 +63,7 @@ def with_tools_outcomes(policy):
 
 def notools_outcomes(policy):
     out = defaultdict(list)
-    for f in glob.glob(str(ROLLOUTS / "raw" / "agentclinic_notools" / policy / "scenario_*_rollout_*.json")):
+    for f in glob.glob(str(ABLATIONS / "agentclinic" / "notools" / POLICY_DIR[policy] / "scenario_*_rollout_*.json")):
         x = json.load(open(f)); out[int(x["scenario_id"])].append(int(bool(x["correct"])))
     return out
 
@@ -90,7 +90,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="compare with shipped lists; do not overwrite")
     args = ap.parse_args()
-    require(ROLLOUTS / "raw" / "agentclinic_notools", "no-tools rollouts", "rollouts")
+    require(ABLATIONS / "agentclinic" / "notools", "no-tools rollouts", "ablations")
     print(f"{'policy':11} {'scenarios':>9} {'mixed':>5} {'tool-reliant':>12} {'no confirmed drop':>18} {'macro dSR':>9}")
     for policy, (tf, nf) in LABEL_FILES.items():
         tool, nontool, mixed, n, dsr = label_policy(policy)

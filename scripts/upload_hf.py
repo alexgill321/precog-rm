@@ -34,7 +34,8 @@ import re
 
 # never published: credential files, harness scratch dirs, caches, OS cruft
 EXCLUDE_DIRS = {"_bfcl_tmp", "__pycache__", ".cache", ".git", ".ipynb_checkpoints"}
-EXCLUDE_FILE = re.compile(r"^\.env(\..*)?$|^\.DS_Store$|\.(pem|key|p12)$|credential|secret", re.I)
+EXCLUDE_FILE = re.compile(r"^\.env(\..*)?$|^\.DS_Store$|\.(pem|key|p12)$|credential|secret"
+                          r"|^train\.log$|^tinker_session\.txt$", re.I)   # training-service logs: resume URIs, bucket names, emails
 SECRET_PAT = re.compile(rb"sk-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{20,}|tinker_[A-Za-z0-9_-]{10,}|tk-[A-Za-z0-9_-]{16,}"
                         rb"|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}"
                         rb"|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|\"private_key\"|sk-or-v1-[a-f0-9]{20,}"

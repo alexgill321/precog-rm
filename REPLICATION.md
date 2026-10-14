@@ -64,18 +64,6 @@ policies) is shipped and must not be regenerated.
 | App. M Fig. 6 + quoted replay numbers | `python scripts/replay_sweep_table.py; python scripts/fig_sim_pareto.py` | `python scripts/embed_baseline_rollouts.py` (API) then `python scripts/run_grpo_early_stopping_official.py --checkpoint $PRECOG_DATA/ckpts/prefix/grpo_controller_model_prefix.pt --seed 1 2 3` (~1 h) | exact |
 | GRPO controller checkpoint | shipped (`ckpts/prefix/grpo_controller_model_prefix.pt`) | `python scripts/run_prefix_verify.py --domains retail` | stochastic |
 
-## Known differences from the printed paper
-
-* Table 1 cells differ from the printed values by at most 0.001 (rounding of the
-  fold-level aggregation); `print_table1.py` is the reference.
-* App. K text: the controller's cost at policy parity ranges 0.8 to 2.3
-  points across configurations (paper says 0.8 to 1.5).
-* App. M text: permanent-support reward bias at theta=0.9 is 0.027 (paper says
-  below 0.02 for both strategies).
-* Sec. 4.5 text: BFCLv3 stop rate at theta=0.8 is 56%, printed as 59%.
-* AgentClinic resampling for Qwen covers 19 scenarios / 190 rollouts (one
-  scenario lacked a usable diagnosis prefix), printed as 20 x 10.
-
 ## Provenance of shipped caches
 
 | Artifact | Producer |

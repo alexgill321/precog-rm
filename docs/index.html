@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Divergent Paths</title>
+<meta name="description" content="Learning an Outcome-Predictive Representation of LLM Agent Trajectories (Precog-RM): project page with interactive behavior-state maps and latent-space scoring.">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Precog-RM</p>
+    <h1>Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories</h1>
+    <p class="authors">Alexander Gill, Guram Gogia, Francisco Guzmán</p>
+    <p class="links">
+      <a class="btn" href="https://arxiv.org/abs/2610.19614">arXiv</a>
+      <a class="btn" href="https://github.com/alexgill321/precog-rm">Code</a>
+      <a class="btn" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data &amp; checkpoints</a>
+    </p>
+    <p class="abstract">Agentic tool-use trajectories are paths through a shared embedding space of actions and environment observations. Successful and failed rollouts of the same task separate in this space. Precog-RM meta-learns a representation in which rollout success can be predicted few-shot across unseen tasks and policy models, and uses that signal as an early-stopping controller for GRPO post-training.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="explore" class="card">
+    <div class="controls">
+      <label>Benchmark <select id="sel-benchmark"></select></label>
+      <label>Policy <select id="sel-policy"></select></label>
+      <label>Task <select id="sel-task"></select></label>
+      <span id="task-badges" class="badges"></span>
+    </div>
+    <p class="hint" id="load-status">Loading…</p>
+  </section>
+
+  <section class="card">
+    <h2>1 · Behavior-state map</h2>
+    <p class="lede">Every action–observation step of every rollout is embedded, and the steps of one task are clustered into behavior states (HDBSCAN over the joint action–observation similarity, minimum cluster size 5; unassigned steps form one outlier bin). Bar height is how many rollouts sit in a state at that step, bar colour is that state's empirical success rate, and each thin ribbon is one rollout, coloured by its final outcome. <b>Click a bar</b> to read the action–observation pairs in that state; <b>hover a ribbon</b> to follow one rollout.</p>
+    <div class="controls small">
+      <label>Steps shown <input id="flow-steps" type="range" min="2" max="30" value="30"> <span id="flow-steps-val">30</span></label>
+      <label><input id="flow-collapse" type="checkbox"> collapse uniform steps</label>
+      <span class="legend"><i class="sw pass"></i>pass <i class="sw fail"></i>fail <i class="sw grad"></i>state success rate 0→1 <i class="sw noise"></i>outlier bin</span>
+    </div>
+    <div class="split">
+      <div class="grow"><svg id="flow"></svg></div>
+      <aside id="cluster-panel" class="panel"><p class="muted">Click a bar to inspect a behavior state.</p></aside>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2 · How Precog-RM scores a rollout</h2>
+    <p class="lede">The encoder maps a rollout (or any prefix of it) to a 128-d latent vector. A small <b>support set</b> of rollouts with known outcomes defines two prototypes, the mean latent of the passing and of the failing support rollouts; every other rollout is scored by its distance to the two. The map is a 2-D PCA view of that latent space fitted on this task. <b>Click</b> a rollout to select it, <b>shift-click</b> to move it in or out of the support set, and drag the prefix slider to watch the selected rollout's latent move as the agent acts.</p>
+    <div class="controls small">
+      <label>Encoder <select id="sel-encoder">
+        <option value="prefix">prefix-trained (deployed in GRPO, Sec. 5)</option>
+        <option value="full">generalist, full rollouts only (Table 2)</option></select></label>
+      <label>Support set <select id="sel-support">
+        <option value="cv0">3-fold CV: fold 1 held out</option>
+        <option value="cv1">3-fold CV: fold 2 held out</option>
+        <option value="cv2">3-fold CV: fold 3 held out</option>
+        <option value="first8">first 8 rollouts (GRPO-style first batch)</option>
+        <option value="custom">custom</option></select></label>
+      <span id="score-badges" class="badges"></span>
+    </div>
+    <div class="split">
+      <div class="grow">
+        <svg id="latent"></svg>
+        <div class="controls small">
+          <label>Prefix length <input id="prefix-t" type="range" min="1" max="1" value="1"> <span id="prefix-t-val"></span></label>
+          <span id="sel-readout" class="readout"></span>
+        </div>
+        <svg id="curve"></svg>
+      </div>
+      <aside class="panel">
+        <h3>Scores under this support set</h3>
+        <svg id="strip"></svg>
+        <p class="muted small-text">Queries only (support rollouts excluded). AUROC is over these queries. Scores are softmax over negative prototype distances, the rule the encoder was trained with.</p>
+        <div id="sel-steps" class="steps"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Citation</h2>
+<pre>@article{gill2026divergent,
+  title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
+  author  = {Gill, Alexander and Gogia, Guram and Guzm\'an, Francisco},
+  journal = {arXiv preprint arXiv:2610.19614},
+  year    = {2026}
+}</pre>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

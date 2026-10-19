@@ -17,3 +17,6 @@ exp/results/protonet_ablations/traj_parts/
 exp/results/protonet_ablations/prefix_verify/
 *.ckpt
 *.pt
+
+# project-page bundles (built by scripts/build_web_bundles.py, served from the HF dataset repo web/ part)
+docs/data/

@@ -10,11 +10,14 @@ plus a model repo for checkpoints:
   grpo/{runs,replay,eval}/                                  the 21 official GRPO runs and replay results
   caches/mmap/                                              optional float16 fast path
   ablations/agentclinic/{notools,resample,terra}, meta/     AgentClinic ablation data, task lists
-  checkpoints (model repo agill32/precog-rm-checkpoints)    -> ckpts/
+  checkpoints (model repo agill32/precog-rm-checkpoints)    -> ckpts/ (re-folded, see below)
 
 After downloading, `materialize()` builds `table1_data/<benchmark>_<model>/`
 (reward stubs + embeddings/{action,response}/<task>.npz as hard links) so every
-script runs unchanged, and extracts any tarball.
+script runs unchanged, extracts any tarball, and re-folds the model repo
+(checkpoints/{sweep,design_study,prefix,grpo_controller.pt}) into the layout
+`scripts/_paths.py` reads: ckpts/{precog,ablations,prefix}/ with the GRPO
+controller at ckpts/prefix/grpo_controller_model_prefix.pt.
 
     python scripts/download.py --part checkpoints caches            # enough to re-evaluate everything
     python scripts/download.py --part embeddings --benchmark tau2   # one benchmark's embeddings
@@ -78,6 +81,33 @@ def materialize(root: Path):
     if n:
         print(f"materialized {n} task cells under {root / 'table1_data'}")
     extract_tarballs(root)
+    refold_checkpoints(root / "ckpts")
+
+
+# model repo folder -> what scripts/_paths.py (CKPT_PRECOG / CKPT_ABL / CKPT_PREFIX) reads;
+# the inverse of upload_hf.stage_part("checkpoints")
+CKPT_FOLDERS = {"sweep": "precog", "design_study": "ablations", "prefix": "prefix"}
+CKPT_CONTROLLER = ("grpo_controller.pt", Path("prefix") / "grpo_controller_model_prefix.pt")
+
+
+def refold_checkpoints(ckpts: Path):
+    """ckpts/checkpoints/<hub folder>/*.pt -> ckpts/<code folder>/*.pt (hard links, idempotent)."""
+    hub = ckpts / "checkpoints"
+    if not hub.exists():
+        return
+    n = 0
+    for src_name, dst_name in CKPT_FOLDERS.items():
+        d = hub / src_name
+        if d.is_dir():
+            for f in sorted(d.glob("*.pt")):
+                link(f, ckpts / dst_name / f.name)
+                n += 1
+    ctrl = hub / CKPT_CONTROLLER[0]
+    if ctrl.exists():
+        link(ctrl, ckpts / CKPT_CONTROLLER[1])
+        n += 1
+    if n:
+        print(f"re-folded {n} checkpoints into {ckpts}/{{precog,ablations,prefix}}")
 
 
 def extract_tarballs(root: Path):

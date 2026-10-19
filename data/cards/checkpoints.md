@@ -11,17 +11,21 @@ of LLM Agent Trajectories"* (Gill, Gogia, Guzmán), [arXiv:2610.19614](http://ar
 https://github.com/alexgill321/precog-rm (`src/prm/train_precog.py:PrecogProtoNet.load`).
 
 ```
-precog/precog_<pool>_s<seed>.pt      75 checkpoints of the main sweep (25 training pools x seeds 0-2):
-                                     <benchmark>_<g|q|d combination> (g=GPT-5-mini, q=Qwen3-80B, d=DeepSeek-V3.2),
-                                     two-benchmark and generalist pools as <b1>-<b2>[-<b3>]_all.
-                                     10,000 episodes each; Tables 1-2, Figure 3, Appendix J.
-ablations/src_<name>_s0.pt           single-seed design study on tau2/qwen (Appendices C, F; 4,000 episodes)
-ablations/mix_<name>_s0.pt           the same ablations retrained on the all-cell pool
-ablations/pool_<pool>_full_s0.pt     epoch-resolved pool sweep (notebook study)
-prefix/prefix_<pool>_<variant>_s0.pt prefix-trained encoders (Section 4.5, Figure 4)
-prefix/grpo_controller_model_prefix.pt  the controller deployed inside GRPO (Section 5); trained on
-                                     tau2/qwen with scripts/run_prefix_verify.py (predates the final sweep protocol)
+checkpoints/sweep/precog_<pool>_s<seed>.pt      75 checkpoints of the main sweep (25 training pools x seeds 0-2):
+                                                <benchmark>_<g|q|d combination> (g=GPT-5-mini, q=Qwen3-80B, d=DeepSeek-V3.2),
+                                                two-benchmark and generalist pools as <b1>-<b2>[-<b3>]_all.
+                                                10,000 episodes each; Tables 1-2, Figure 3, Appendix J.
+checkpoints/design_study/src_<name>_s0.pt       single-seed design study on tau2/qwen (Appendices C, F; 4,000 episodes)
+checkpoints/design_study/mix_<name>_s0.pt       the same ablations retrained on the all-cell pool
+checkpoints/design_study/pool_<pool>_full_s0.pt epoch-resolved pool sweep (notebook study)
+checkpoints/prefix/prefix_<pool>_<variant>_s0.pt prefix-trained encoders (Section 4.5, Figure 4)
+checkpoints/grpo_controller.pt                  the controller deployed inside GRPO (Section 5); trained on
+                                                tau2/qwen with scripts/run_prefix_verify.py (predates the final sweep protocol)
 ```
+
+`scripts/download.py --part checkpoints` fetches this repo into `$PRECOG_DATA/ckpts/`
+and re-folds it into the layout the code reads: `ckpts/precog/`, `ckpts/ablations/`,
+`ckpts/prefix/` (with the controller as `ckpts/prefix/grpo_controller_model_prefix.pt`).
 
 Architecture: linear projection of 3072-d step embeddings to d'=128, 2-layer transformer
 (4 heads, FFN 512, dropout 0.3), masked mean pooling, unsquared-Euclidean prototypes.

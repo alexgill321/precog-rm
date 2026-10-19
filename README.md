@@ -22,15 +22,19 @@ layout (`generation/`), for anyone who wants to rebuild the corpora from scratch
 
 ## Data release
 
-All four repos are grouped in the HuggingFace collection
-[Precog-RM](https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8).
+Both repos are grouped in the HuggingFace collection
+[Precog-RM](https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8):
+one dataset repo holding every part of the release, and one model repo for the
+checkpoints. Download a part at a time with `scripts/download.py --part ...`.
 
-| HuggingFace repo | Contents | Size |
-|---|---|---|
-| `agill32/precog-rm-embeddings` | step embeddings for the 9 (benchmark, policy) cells, tau2 rollouts, reasoning embeddings, replay embeddings, optional mmap caches | 25 GB (+13 GB replay, +10 GB caches) |
-| `agill32/precog-rm-checkpoints` | 75 sweep checkpoints, design-study and prefix-trained encoders, the deployed GRPO controller | 0.5 GB |
-| `agill32/precog-rm-grpo-logs` | the 21 official GRPO runs (metrics, full rollouts, support sets), replay results, base-model eval | 35 GB |
-| `agill32/precog-rm-rollouts` | raw BFCLv3 and AgentClinic trajectories, no-tools ablation, final-diagnosis resamples, task lists | 5 GB |
+| HuggingFace repo | Part | Contents | Size |
+|---|---|---|---|
+| `agill32/precog-rm` (dataset) | `rollouts` | raw trajectories for the 9 (benchmark, policy) cells, 50 per task, one JSON each | 8 GB |
+| | `embeddings` | step embeddings for the 9 cells, reasoning embeddings, baseline-GRPO replay embeddings | 22 GB (+13 GB replay) |
+| | `grpo` | the 21 official GRPO runs (metrics, full rollouts, support sets), replay results, base-model eval | 32 GB |
+| | `caches` | optional float16 mmap caches (what every experiment reads) | 10 GB |
+| | `ablations`, `meta` | AgentClinic no-tools ablation, final-diagnosis resamples, task lists | <0.1 GB |
+| `agill32/precog-rm-checkpoints` (model) | `checkpoints` | 75 sweep checkpoints, design-study and prefix-trained encoders, the deployed GRPO controller | 0.4 GB |
 
 ```bash
 pip install -r requirements.txt

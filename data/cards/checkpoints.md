@@ -7,7 +7,7 @@ pretty_name: Precog-RM checkpoints
 # Precog-RM checkpoints
 
 Trained encoders from *"Divergent Paths: Learning an Outcome-Predictive Representation
-of LLM Agent Trajectories"* (Gill, Gogia, Guzmán). Code and loaders:
+of LLM Agent Trajectories"* (Gill, Gogia, Guzmán), [arXiv:2610.19614](http://arxiv.org/abs/2610.19614). Code and loaders:
 https://github.com/alexgill321/precog-rm (`src/prm/train_precog.py:PrecogProtoNet.load`).
 
 ```

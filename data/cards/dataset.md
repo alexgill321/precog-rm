@@ -9,7 +9,7 @@ size_categories: [10B<n<100B]
 # Precog-RM data release
 
 Everything behind *"Divergent Paths: Learning an Outcome-Predictive Representation of
-LLM Agent Trajectories"* (Gill, Gogia, Guzmán). Code and replication guide:
+LLM Agent Trajectories"* (Gill, Gogia, Guzmán), [arXiv:2610.19614](http://arxiv.org/abs/2610.19614). Code and replication guide:
 https://github.com/alexgill321/precog-rm. Checkpoints: `agill32/precog-rm-checkpoints`.
 
 Four parts, browsable top-down. Benchmarks: `tau2` (Tau2-Bench), `bfclv3`

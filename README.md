@@ -2,7 +2,7 @@
 
 Code and data release for *"Divergent Paths: Learning an Outcome-Predictive
 Representation of LLM Agent Trajectories"* (Alexander Gill, Guram Gogia,
-Francisco Guzmán). Paper: **arXiv link TBD**.
+Francisco Guzmán). Paper: [arXiv:2610.19614](http://arxiv.org/abs/2610.19614).
 
 Precog-RM reframes agentic tool-use trajectories as paths through a shared
 embedding space of actions and environment observations, meta-learns a
@@ -100,8 +100,9 @@ The FLOPs accounting of Table 3 / Appendix K is in `scripts/grpo_common.py`.
 @article{gill2026divergent,
   title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
   author  = {Gill, Alexander and Gogia, Guram and Guzmán, Francisco},
-  journal = {arXiv preprint},
-  year    = {2026}
+  journal = {arXiv preprint arXiv:2610.19614},
+  year    = {2026},
+  url     = {http://arxiv.org/abs/2610.19614}
 }
 ```
 

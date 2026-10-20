@@ -7,15 +7,15 @@
 const PASS = "#2a9d4a", FAIL = "#d13b3b", NOISE = "#b9b9b9", NOISE_STROKE = "#7b3fb3", INK = "#1c1c1c", MUTED = "#8a8a86";
 const ACT = "#2b5fb3", ACT_BG = "#e8eefc", OBS = "#8a5a00", OBS_BG = "#f7ecd9";
 const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
-const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 80000;
+const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 90000;
 const BEATS = [
   { t0: 0.00, t1: 0.21, title: "One task, one attempt", text: "The agent acts; the user or the system answers. The outcome is known only at the end." },
   { t0: 0.21, t1: 0.33, title: "Same task, sixteen attempts", text: "Different moves, different endings." },
-  { t0: 0.33, t1: 0.46, title: "Similar steps merge into states", text: "First one step across attempts, then every step. Each rollout becomes a route; red states lead to failure." },
-  { t0: 0.46, t1: 0.57, title: "The encoder folds a route into a point", text: "Routes that end alike land near each other." },
-  { t0: 0.57, t1: 0.66, title: "Two prototypes from one labeled batch", text: "No fitting: the mean of the passes and the mean of the failures." },
-  { t0: 0.66, t1: 0.87, title: "Scoring a new rollout as it unfolds", text: "Its point moves after every step; distance to the prototypes gives P(pass)." },
-  { t0: 0.87, t1: 1.00, title: "Confident enough: stop", text: "The predicted outcome becomes the reward. The rest is never generated." },
+  { t0: 0.33, t1: 0.54, title: "Similar steps merge into states", text: "One step across attempts first, then every step. Each rollout is a route through the states; red states lead to failure." },
+  { t0: 0.54, t1: 0.63, title: "The encoder folds a route into a point", text: "Routes that end alike land near each other." },
+  { t0: 0.63, t1: 0.71, title: "Two prototypes from one labeled batch", text: "No fitting: the mean of the passes and the mean of the failures." },
+  { t0: 0.71, t1: 0.89, title: "Scoring a new rollout as it unfolds", text: "Its point moves after every step; distance to the prototypes gives P(pass)." },
+  { t0: 0.89, t1: 1.00, title: "Confident enough: stop", text: "The predicted outcome becomes the reward. The rest is never generated." },
 ];
 const TASK_GLOSS = { "retail/103": "Customer support: return two items from a delivered order, then sort out a second order." };
 const TOOL_ICON = [[/find_user|get_user/, "id-card"], [/get_order/, "package"], [/get_product|list_all_product/, "tag"], [/return_/, "undo-2"], [/exchange_/, "repeat"], [/modify_.*address/, "map-pin"], [/modify_/, "pencil"], [/cancel_/, "ban"], [/transfer_to_human/, "hand-helping"], [/calculate/, "calculator"], [/certificate|refund/, "credit-card"]];
@@ -38,6 +38,15 @@ function icon(g, name, x, y, size, color = INK, op = 1) {
   const k = size / 24, el = g.append("g").attr("transform", `translate(${x - size / 2},${y - size / 2}) scale(${k})`).attr("fill", "none").attr("stroke", color)
     .attr("stroke-width", 2).attr("stroke-linecap", "round").attr("stroke-linejoin", "round").attr("opacity", op);
   el.html(window.LUCIDE[name] || window.LUCIDE["wrench"]); return el;
+}
+// one step as an (action, observation) tuple: a pill, action on top (blue), observation below (tan)
+function pair(g, x, y, ai, oi, size, op = 1, stroke = 0) {
+  const w = size * 1.5, h = size * 2.9, el = g.append("g").attr("transform", `translate(${x - w / 2},${y - h / 2})`).attr("opacity", op);
+  el.append("path").attr("d", `M${w / 2},0 h0 a${w / 2},${w / 2} 0 0 1 ${w / 2},${w / 2} v${h / 2 - w / 2} h${-w} v${-(h / 2 - w / 2)} a${w / 2},${w / 2} 0 0 1 ${w / 2},${-w / 2} z`).attr("fill", ACT_BG);
+  el.append("path").attr("d", `M0,${h / 2} h${w} v${h / 2 - w / 2} a${w / 2},${w / 2} 0 0 1 ${-w / 2},${w / 2} h0 a${w / 2},${w / 2} 0 0 1 ${-w / 2},${-w / 2} z`).attr("fill", OBS_BG);
+  if (stroke) el.append("rect").attr("width", w).attr("height", h).attr("rx", w / 2).attr("fill", "none").attr("stroke", "#c9c9c3").attr("stroke-width", stroke);
+  icon(el, ai, w / 2, h / 4, size, ACT); icon(el, oi, w / 2, 3 * h / 4, size, OBS);
+  return el;
 }
 function wrap(text, cpl) { const words = text.split(" "), lines = []; let cur = ""; words.forEach(w => { if ((cur + " " + w).trim().length > cpl && cur) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim(); }); if (cur) lines.push(cur); return lines; }
 
@@ -68,12 +77,12 @@ function buildScene(b) {
   const stations = [], stPos = new Map(), colStates = [];
   for (let t = 0; t < STEPS; t++) {
     const present = new Map();
-    trains.forEach(r => { if (t < r.n_steps) { const c = r.steps[t].c; if (!present.has(c)) present.set(c, []); present.get(c).push(icons.get(r.rid)[t]); } });
+    trains.forEach(r => { if (t < r.n_steps) { const c = r.steps[t].c; if (!present.has(c)) present.set(c, []); present.get(c).push([icons.get(r.rid)[t], obs.get(r.rid)[t]]); } });
     const order = [...present.keys()].sort((a, c) => (sr.get(c) - sr.get(a)) || (a - c));
     colStates.push(order.length);
     const ys = d3.scalePoint().domain(order).range([70, 370]).padding(0.5);
-    order.forEach(c => { const ic = present.get(c), top = [...d3.rollup(ic, v => v.length, d => d)].sort((p, q) => q[1] - p[1])[0][0];
-      const s = { t, c, x: xs(t), y: order.length === 1 ? 220 : ys(c), n: ic.length, icon: top }; stations.push(s); stPos.set(`${t}:${c}`, s); });
+    order.forEach(c => { const ic = present.get(c), mode = (k) => [...d3.rollup(ic, v => v.length, d => d[k])].sort((p, q) => q[1] - p[1])[0][0];
+      const s = { t, c, x: xs(t), y: order.length === 1 ? 220 : ys(c), n: ic.length, icon: mode(0), oicon: mode(1) }; stations.push(s); stPos.set(`${t}:${c}`, s); });
   }
   // the column used to show merging first: the earliest step with 2-4 states
   const focusCol = colStates.findIndex((n, t) => t >= 2 && n >= 2 && n <= 4);
@@ -106,8 +115,10 @@ function render(p) {
   $("#pipeline-title").textContent = BEATS[bi].title; $("#pipeline-text").textContent = BEATS[bi].text;
   document.querySelectorAll("#pipeline-beats button").forEach((el, i) => el.classList.toggle("on", i === bi));
   const zoom = bi < 1 ? 0 : bi === 1 ? ease(sub(q, 0, 0.35)) : 1;                       // whole rollout -> sixteen lanes
-  const group1 = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.08, 0.45)) : 1;                   // the focus column merges
-  const group = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.5, 0.8)) : 1;                      // every column merges
+  const group1 = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.05, 0.3)) : 1;                    // the focus column merges
+  const group = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.34, 0.54)) : 1;                     // every column merges
+  const runOne = bi < 2 ? 0 : bi === 2 ? sub(q, 0.58, 0.76) : 1;                          // one rollout travels its route
+  const runAll = bi < 2 ? 0 : bi === 2 ? sub(q, 0.8, 1) : 1;                              // the others follow
   const morph = bi < 3 ? 0 : bi === 3 ? ease(q) : 1;
   const district = bi < 4 ? 0 : bi === 4 ? ease(q) : 1;
   const travel = bi < 5 ? 0 : bi === 5 ? q : 1;
@@ -118,15 +129,21 @@ function render(p) {
     S.stations.forEach(d => { const op = bi === 2 ? (d.t === S.focusCol ? group1 : group) : 1; if (op <= 0) return;
       const r = 9 + Math.sqrt(d.n) * 2.6, sg = st.append("g").attr("transform", `translate(${d.x},${d.y})`).attr("opacity", op);
       sg.append("circle").attr("r", r).attr("fill", "#fff").attr("stroke", S.noise.get(d.c) ? NOISE_STROKE : srColor(S.sr.get(d.c))).attr("stroke-width", 3.5).attr("stroke-dasharray", S.noise.get(d.c) ? "3,2" : null);
-      icon(sg, d.icon, 0, 0, Math.max(10, r * 1.1), INK); });
+      pair(sg, 0, 0, d.icon, d.oicon, Math.max(7, r * 0.58)); });
     if (bi > 2 || group > 0) d3.range(STEPS).forEach(t => st.append("text").attr("x", S.xs(t)).attr("y", 405).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).attr("opacity", group).text(t + 1));
   }
-  const routeOp = bi < 2 ? 0 : bi === 2 ? sub(q, 0.8, 1) : 1;
-  if (routeOp > 0) S.routes.forEach(r => {
+  if (runOne > 0) S.routes.forEach((r, i) => {
+    // how far along its route this rollout has travelled: rollout 0 first, then the rest with a stagger
+    const frac = bi > 2 ? 1 : i === 0 ? ease(runOne) : ease(sub(runAll, (i - 1) * 0.025, 0.65 + (i - 1) * 0.025));
+    if (frac <= 0) return;
     const target = S.latent.get(r.rid), pts = r.pts.map(pt => [lerp(pt[0], target[0], morph), lerp(pt[1], target[1], morph)]);
-    g.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", r.pass ? PASS : FAIL).attr("stroke-width", 2).attr("stroke-opacity", routeOp * (0.7 - 0.3 * morph));
+    const path = g.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", r.pass ? PASS : FAIL).attr("stroke-width", bi === 2 && i === 0 && runAll < 1 ? 3 : 2).attr("stroke-opacity", 0.7 - 0.3 * morph);
+    if (frac < 1) { const L = path.node().getTotalLength(); path.attr("stroke-dasharray", `${L * frac} ${L}`);
+      const h = path.node().getPointAtLength(L * frac); const sp = g.append("g").attr("transform", `translate(${h.x},${h.y})`);
+      sp.append("circle").attr("r", 9).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2); icon(sp, "bot", 0, 0, 11, INK); return; }
     const head = pts[pts.length - 1];
-    g.append("circle").attr("cx", head[0]).attr("cy", head[1]).attr("r", 4.5 + 1.5 * morph).attr("fill", r.pass ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.2).attr("opacity", routeOp);
+    g.append("circle").attr("cx", head[0]).attr("cy", head[1]).attr("r", 4.5 + 1.5 * morph).attr("fill", r.pass ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.2);
+    icon(g, r.pass ? "circle-check" : "circle-x", head[0] + (bi === 2 ? 12 : 0), head[1], 11, r.pass ? PASS : FAIL, bi === 2 ? 1 : 0);
   });
   if (district > 0) {
     S.rolls.filter(r => !S.supIds.has(r.rid) && r.rid !== S.query.r.rid).forEach(r => { const [x, y] = S.latent.get(r.rid);
@@ -194,32 +211,24 @@ function drawIntro(g, S, bi, q, zoom, group1, group) {
     // agent at left
     cu.append("circle").attr("cx", 120).attr("cy", 232).attr("r", 30).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2.5);
     icon(cu, "bot", 120, 232, 34, INK); cu.append("text").attr("x", 120).attr("y", 280).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", MUTED).text(`agent · step ${Math.min(step + 1, n)} of ${focus.n_steps}`);
-    const slideA = fin ? 1 : ease(sub(f, 0.0, 0.35)), slideO = fin ? 1 : ease(sub(f, 0.45, 0.8));
-    // ACTION card
-    const ax = lerp(240, 200, slideA), aOp = slideA;
-    const ca = cu.append("g").attr("opacity", aOp).attr("transform", `translate(${ax},92)`);
-    card(ca, 0, 0, 600, 118, ACT_BG, ACT, 1);
-    ca.append("text").attr("x", 16).attr("y", 22).attr("font-size", 11).attr("fill", ACT).attr("font-weight", 700).attr("letter-spacing", 1.2).text("ACTION");
-    ca.append("text").attr("x", 76).attr("y", 22).attr("font-size", 11).attr("fill", ACT).text(`· ${ICON_LABEL[st.ai]}`);
-    icon(ca, st.ai, 36, 66, 40, ACT);
-    wrap(st.at, 78).slice(0, 3).forEach((l, i) => ca.append("text").attr("x", 72).attr("y", 50 + i * 17).attr("font-size", 12.5).attr("fill", INK).attr("font-family", toolCall(st.at + "(") && /\(/.test(st.at) ? "ui-monospace, Menlo, monospace" : null).text(l));
-    // arrow agent -> action
-    cu.append("path").attr("d", `M152,222 C180,200 180,160 ${ax - 4},150`).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2).attr("opacity", aOp).attr("marker-end", "url(#arrowA)");
-    // OBSERVATION card
-    const ox = lerp(240, 200, slideO), oOp = slideO;
-    const co = cu.append("g").attr("opacity", oOp).attr("transform", `translate(${ox},238)`);
-    card(co, 0, 0, 600, 118, OBS_BG, OBS, 1);
-    co.append("text").attr("x", 16).attr("y", 22).attr("font-size", 11).attr("fill", OBS).attr("font-weight", 700).attr("letter-spacing", 1.2).text("OBSERVATION");
-    co.append("text").attr("x", 112).attr("y", 22).attr("font-size", 11).attr("fill", OBS).text(`· ${ICON_LABEL[st.oi]}`);
-    icon(co, st.oi, 36, 66, 40, OBS);
-    wrap(st.ot, 78).slice(0, 3).forEach((l, i) => co.append("text").attr("x", 72).attr("y", 50 + i * 17).attr("font-size", 12.5).attr("fill", INK).text(l));
-    cu.append("path").attr("d", `M${ox - 4},300 C180,305 180,260 152,244`).attr("fill", "none").attr("stroke", OBS).attr("stroke-width", 2).attr("opacity", oOp).attr("marker-end", "url(#arrowO)");
+    const slideA = fin ? 1 : ease(sub(f, 0.0, 0.3)), slideO = fin ? 1 : ease(sub(f, 0.42, 0.72));
+    // one card per step: the (action, observation) tuple
+    const cx = lerp(240, 200, slideA), cd = cu.append("g").attr("opacity", slideA).attr("transform", `translate(${cx},84)`);
+    card(cd, 0, 0, 620, 236, "#fff", "#c9c9c3", 1);
+    cd.append("text").attr("x", 18).attr("y", 24).attr("font-size", 11).attr("fill", MUTED).attr("letter-spacing", 1.2).text(`STEP ${step + 1}`);
+    cd.append("text").attr("x", 300).attr("y", 24).attr("text-anchor", "middle").attr("font-size", 13).attr("fill", MUTED).text("( action , observation )");
+    const row = (y, bg, col, label, ic, name, text, op, mono) => { const rw = cd.append("g").attr("opacity", op).attr("transform", `translate(14,${y})`);
+      card(rw, 0, 0, 592, 92, bg, col, 1); rw.append("text").attr("x", 14).attr("y", 20).attr("font-size", 11).attr("fill", col).attr("font-weight", 700).attr("letter-spacing", 1.2).text(label);
+      rw.append("text").attr("x", 14 + label.length * 8.2).attr("y", 20).attr("font-size", 11).attr("fill", col).text(`· ${name}`); icon(rw, ic, 36, 58, 34, col);
+      wrap(text, 80).slice(0, 2).forEach((l, i) => rw.append("text").attr("x", 66).attr("y", 50 + i * 17).attr("font-size", 12.5).attr("fill", INK).attr("font-family", mono ? "ui-monospace, Menlo, monospace" : null).text(l)); };
+    row(36, ACT_BG, ACT, "ACTION", st.ai, ICON_LABEL[st.ai], st.at, 1, /\(/.test(st.at) && st.ai !== "message-square");
+    row(136, OBS_BG, OBS, "OBSERVATION", st.oi, ICON_LABEL[st.oi], st.ot, slideO, false);
+    cu.append("path").attr("d", `M152,222 C180,200 180,190 ${cx - 4},185`).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2).attr("opacity", slideA).attr("marker-end", "url(#arrowA)");
+    cu.append("path").attr("d", `M${cx - 4},265 C180,270 180,255 152,244`).attr("fill", "none").attr("stroke", OBS).attr("stroke-width", 2).attr("opacity", slideO).attr("marker-end", "url(#arrowO)");
     // filmstrip of completed steps at the bottom
     const sx = (t) => 118 + t * 96;
     cu.append("line").attr("x1", 90).attr("x2", 118 + (n - 1) * 96 + 40).attr("y1", 400).attr("y2", 400).attr("stroke", "#ddd");
-    cu.append("text").attr("x", 20).attr("y", 386).attr("font-size", 9).attr("fill", ACT).text("actions");
-    cu.append("text").attr("x", 20).attr("y", 420).attr("font-size", 9).attr("fill", OBS).text("observations");
-    for (let t = 0; t < Math.min(k + (f > 0.9 ? 1 : 0), n); t++) { icon(cu, F[t].ai, sx(t), 386, 16, ACT); icon(cu, F[t].oi, sx(t), 416, 16, OBS); }
+    for (let t = 0; t < Math.min(k + (f > 0.85 ? 1 : 0), n); t++) pair(cu, sx(t), 400, F[t].ai, F[t].oi, 11);
     const defs = g.append("defs");
     [["arrowA", ACT], ["arrowO", OBS]].forEach(([id, col]) => defs.append("marker").attr("id", id).attr("viewBox", "0 0 10 10").attr("refX", 9).attr("refY", 5).attr("markerWidth", 7).attr("markerHeight", 7).attr("orient", "auto").append("path").attr("d", "M0,0 L10,5 L0,10 z").attr("fill", col));
   }
@@ -228,15 +237,9 @@ function drawIntro(g, S, bi, q, zoom, group1, group) {
     const wr = g.append("g").attr("opacity", bi === 0 ? out : 1);
     const lane0 = S.laneY(0), ly = lerp(LANE, lane0, zoom);
     wr.append("line").attr("x1", lerp(90, 70, zoom)).attr("x2", lerp(118 + (n - 1) * 96 + 60, 580, zoom)).attr("y1", ly).attr("y2", ly).attr("stroke", "#ddd").attr("stroke-width", lerp(3, 1, zoom));
-    if (zoom < 0.5) { wr.append("text").attr("x", 20).attr("y", ACT_Y + 4).attr("font-size", 11).attr("fill", ACT).attr("opacity", 1 - 2 * zoom).text("actions");
-      wr.append("text").attr("x", 20).attr("y", OBS_Y + 4).attr("font-size", 11).attr("fill", OBS).attr("opacity", 1 - 2 * zoom).text("observations"); }
-    for (let t = 0; t < n; t++) {
-      const x = lerp(AX(t), S.xs(t), zoom), ay = lerp(ACT_Y, lane0, zoom), r = lerp(26, 7, zoom), sz = lerp(28, 11, zoom);
-      wr.append("circle").attr("cx", x).attr("cy", ay).attr("r", r).attr("fill", ACT_BG).attr("stroke", ACT).attr("stroke-width", lerp(1.5, 0, zoom));
-      icon(wr, F[t].ai, x, ay, sz, lerp(0, 1, zoom) > 0.5 ? INK : ACT);
-      if (zoom < 1) { const oy = OBS_Y, op = 1 - zoom; wr.append("circle").attr("cx", x).attr("cy", oy).attr("r", 26).attr("fill", OBS_BG).attr("stroke", OBS).attr("stroke-width", 1.5).attr("opacity", op);
-        icon(wr, F[t].oi, x, oy, 28, OBS, op); wr.append("line").attr("x1", x).attr("x2", x).attr("y1", ACT_Y + 28).attr("y2", OBS_Y - 28).attr("stroke", "#ccc").attr("opacity", op); }
-    }
+    if (zoom < 0.5) { wr.append("text").attr("x", 20).attr("y", LANE - 30).attr("font-size", 11).attr("fill", ACT).attr("opacity", 1 - 2 * zoom).text("action");
+      wr.append("text").attr("x", 20).attr("y", LANE + 36).attr("font-size", 11).attr("fill", OBS).attr("opacity", 1 - 2 * zoom).text("observation"); }
+    for (let t = 0; t < n; t++) pair(wr, lerp(AX(t), S.xs(t), zoom), ly, F[t].ai, F[t].oi, lerp(24, 7, zoom), 1, lerp(1, 0, zoom));
     // steps beyond the close-up appear as the rollout zooms out
     if (bi === 0 && focus.n_steps > n) wr.append("text").attr("x", 118 + (n - 1) * 96 + 44).attr("y", LANE + 4).attr("font-size", 12).attr("fill", MUTED).text(`… ${focus.n_steps - n} more steps`);
     const sprX = lerp(118 + (n - 1) * 96 + 60, S.xs(Math.min(STEPS, focus.n_steps) - 1) + 14, zoom);
@@ -258,7 +261,7 @@ function drawIntro(g, S, bi, q, zoom, group1, group) {
       const x = lerp(S.xs(t), st.x + (kk % 3 - 1) * 3, gg), yy = lerp(y, st.y + (Math.floor(kk / 3) - 1) * 3, gg);
       const big = t === S.focusCol && bi === 2 ? 1 + 0.9 * Math.sin(Math.PI * Math.min(group1, 1 - group)) : 1;    // the focus column swells while it merges
       const gI = g.append("g").attr("transform", `translate(${x},${yy}) scale(${big})`).attr("opacity", op * (1 - gg) * dim);
-      gI.append("circle").attr("r", 7.5).attr("fill", ACT_BG); icon(gI, ic[t], 0, 0, 11, INK);
+      pair(gI, 0, 0, ic[t], S.obs.get(r.rid)[t], 7);
     }
     if (i > 0 && bi === 1 && li < 1 && zoom >= 1) { const ax = S.xs(Math.max(0, shownSteps - 1)); const sp = g.append("g").attr("transform", `translate(${ax + 14},${y})`).attr("opacity", op);
       sp.append("circle").attr("r", 7).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 1.5); icon(sp, "bot", 0, 0, 9, INK); }

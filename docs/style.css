@@ -45,3 +45,13 @@ svg { width:100%; display:block; }
 .steps .step .t { color:var(--muted); font-size:12px; }
 pre { background:#f1f1ee; padding:12px; border-radius:8px; overflow:auto; font-size:13px; }
 @media (max-width: 900px) { .split { flex-direction:column; } .panel { flex-basis:auto; width:100%; max-height:420px; } .hero h1 { font-size:24px; } }
+
+/* pipeline animation */
+.pipeline-wrap { display:flex; gap:18px; align-items:stretch; }
+.pipeline-wrap #pipeline { flex:1 1 0; min-width:0; height:auto; aspect-ratio:900/440; background:#fbfbfa; border:1px solid var(--line); border-radius:10px; }
+.pipeline-caption { flex:0 0 300px; display:flex; flex-direction:column; gap:8px; }
+.pipeline-caption input[type=range] { width:100%; }
+.btn.dark { background:#141a2a; color:#fff; border-color:#141a2a; cursor:pointer; font:inherit; font-size:14px; }
+.beats button { font:inherit; font-size:12px; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; margin-left:4px; cursor:pointer; }
+.beats button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+@media (max-width: 900px) { .pipeline-wrap { flex-direction:column; } .pipeline-caption { flex-basis:auto; } }

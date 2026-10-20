@@ -58,6 +58,8 @@ async function loadSelected() {
   if (!B.encoders[S.encoder]) S.encoder = Object.keys(B.encoders)[0];
   S.sel = null; applyPreset();
   drawFlow(); drawScoring();
+  window.PRECOG_BUNDLE = B;
+  document.dispatchEvent(new CustomEvent("precog:bundle", { detail: B }));
 }
 $("#flow-steps").oninput = (e) => { flowState.steps = +e.target.value; $("#flow-steps-val").textContent = flowState.steps; drawFlow(); };
 $("#flow-collapse").onchange = (e) => { flowState.collapse = e.target.checked; drawFlow(); };

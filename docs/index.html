@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
 <meta name="description" content="Learning an Outcome-Predictive Representation of LLM Agent Trajectories (Precog-RM): project page with interactive behavior-state maps and latent-space scoring.">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body>
@@ -24,6 +24,23 @@
 </header>
 
 <main class="wrap">
+  <section id="pipeline-section" class="card">
+    <h2>How it works, in one map</h2>
+    <p class="lede">The same 50 rollouts of one task, retail/103 from Tau2-Bench, carried through the whole pipeline: behavior states as stations, rollouts as trains, the encoder folding each route into a point, prototypes forming from one batch of labeled rollouts, and the controller stopping a new rollout before it finishes.</p>
+    <div class="pipeline-wrap">
+      <svg id="pipeline"></svg>
+      <aside class="pipeline-caption">
+        <div class="controls small">
+          <button id="pipeline-play" class="btn dark">▶ play</button>
+          <span id="pipeline-beats" class="beats"></span>
+        </div>
+        <input id="pipeline-scrub" type="range" min="0" max="1000" value="0">
+        <h3 id="pipeline-title"></h3>
+        <p id="pipeline-text" class="small-text"></p>
+      </aside>
+    </div>
+  </section>
+
   <section id="explore" class="card">
     <div class="controls">
       <label>Benchmark <select id="sel-benchmark"></select></label>
@@ -91,6 +108,7 @@
 }</pre>
   </section>
 </main>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
+<script src="pipeline.js?v=4"></script>
 </body>
 </html>

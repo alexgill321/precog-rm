@@ -7,14 +7,14 @@
 const PASS = "#2a9d4a", FAIL = "#d13b3b", NOISE = "#b9b9b9", NOISE_STROKE = "#7b3fb3", INK = "#1c1c1c", MUTED = "#8a8a86";
 const ACT = "#2b5fb3", ACT_BG = "#e8eefc", OBS = "#8a5a00", OBS_BG = "#f7ecd9";
 const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
-const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 110000;
+const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 125000;
 const BEATS = [
-  { t0: 0.00, t1: 0.16, title: "One task, one attempt", text: "The agent acts; the user or the system answers. The outcome is known only at the end." },
-  { t0: 0.16, t1: 0.26, title: "Same task, sixteen attempts", text: "Different moves, different endings." },
-  { t0: 0.26, t1: 0.44, title: "Similar steps merge into states", text: "One step across attempts first, then every step. Each rollout is a route through the states; red states lead to failure." },
-  { t0: 0.44, t1: 0.66, title: "Meet Precog-RM", text: "Each (action, observation) is embedded; the sequence runs through a small transformer; mean pooling gives one point z. The point settles as steps arrive. The label comes last." },
-  { t0: 0.66, t1: 0.80, title: "Two prototypes from labeled rollouts", text: "Sixteen labeled rollouts become sixteen points. The mean of the passes and the mean of the failures are the prototypes." },
-  { t0: 0.80, t1: 1.00, title: "A new rollout, step by step", text: "Re-encoded after every step, its point drifts toward the prototype it resembles. Distance gives P(pass)." },
+  { t0: 0.00, t1: 0.14, title: "One task, one attempt", text: "The agent acts; the user or the system answers. The outcome is known only at the end." },
+  { t0: 0.14, t1: 0.22, title: "Same task, sixteen attempts", text: "Different moves, different endings." },
+  { t0: 0.22, t1: 0.38, title: "Similar steps merge into states", text: "One step across attempts first, then every step. Each rollout is a route through the states; red states lead to failure." },
+  { t0: 0.38, t1: 0.66, title: "Meet Precog-RM", text: "Each action and observation is embedded and projected; a small transformer reads the whole sequence; mean pooling gives one point z. The point settles as steps arrive. The label comes last." },
+  { t0: 0.66, t1: 0.78, title: "Two prototypes from labeled rollouts", text: "Sixteen labeled rollouts become sixteen points. The mean of the passes and the mean of the failures are the prototypes." },
+  { t0: 0.78, t1: 1.00, title: "A new rollout, step by step", text: "Re-encoded after every step, its point drifts toward the prototype it resembles. Distance gives P(pass)." },
 ];
 const TASK_GLOSS = { "retail/103": "Customer support: return two items from a delivered order, then sort out a second order." };
 const TOOL_ICON = [[/find_user|get_user/, "id-card"], [/get_order/, "package"], [/get_product|list_all_product/, "tag"], [/return_/, "undo-2"], [/exchange_/, "repeat"], [/modify_.*address/, "map-pin"], [/modify_/, "pencil"], [/cancel_/, "ban"], [/transfer_to_human/, "hand-helping"], [/calculate/, "calculator"], [/certificate|refund/, "credit-card"]];
@@ -91,7 +91,7 @@ function buildScene(b) {
   const fx = [...finals.values()].map(p => p[0]), fy = [...finals.values()].map(p => p[1]);
   const padx = (d3.max(fx) - d3.min(fx)) * 0.1, pady = (d3.max(fy) - d3.min(fy)) * 0.1;
   // latent panel: below the architecture strip
-  const lx = d3.scaleLinear().domain([d3.min(fx) - padx, d3.max(fx) + padx]).range([200, 860]), ly = d3.scaleLinear().domain([d3.min(fy) - pady, d3.max(fy) + pady]).range([425, 215]);
+  const lx = d3.scaleLinear().domain([d3.min(fx) - padx, d3.max(fx) + padx]).range([540, 870]), ly = d3.scaleLinear().domain([d3.min(fy) - pady, d3.max(fy) + pady]).range([425, 245]);
   const L = (p) => [lx(p[0]), ly(p[1])];
   const latent = new Map([...finals].map(([rid, p]) => [rid, L(p)]));
   const trails = new Map(rolls.map(r => [r.rid, E.z[idx.get(r.rid)].map(z => L(proj(z)))]));
@@ -144,125 +144,187 @@ function render(p) {
 }
 
 // ---------- beats 4-6: the model ----------
-const STAGE = { inX: 40, inW: 180, embX: 240, embW: 112, prjX: 410, prjW: 92, encX: 540, encW: 170, poolX: 740, poolW: 64, zX: 848, y: 68, h: 78 };
-const cellColor = (rid, t, k) => d3.interpolateBlues(0.25 + 0.6 * ((Math.sin(rid * 12.9898 + t * 78.233 + k * 37.719) * 43758.5453) % 1 + 1) % 1);
-function strip(g, x, y, rid, t, n, cw, ch, op = 1) { const el = g.append("g").attr("opacity", op); d3.range(n).forEach(k => el.append("rect").attr("x", x + k * (cw + 1)).attr("y", y - ch / 2).attr("width", cw).attr("height", ch).attr("rx", 1).attr("fill", cellColor(rid, t, k))); return el; }
-function box(g, x, w, label, sub, op, pulse = 0) {
+const ST = { qX: 28, qW: 120, embX: 165, embW: 150, prjX: 345, prjW: 110, encX: 485, encW: 215, poolX: 730, poolW: 68, zX: 846, y: 58, h: 112 };
+const YC = ST.y + ST.h / 2;
+const hueOf = (i) => d3.hsl((360 * i / LANES + 200) % 360, 0.6, 0.5).formatHex();
+const hash = (a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1;
+// an embedding vector as a row of cells in the rollout's hue (lightness varies per cell)
+function vec(g, x, y, n, cw, ch, hue, seed, op = 1, kind = null) {
+  const el = g.append("g").attr("opacity", op), base = d3.hsl(hue);
+  d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x + k * (cw + 1)).attr("y", y - ch / 2).attr("width", cw).attr("height", ch).attr("rx", 1).attr("fill", c.formatHex()); });
+  if (kind) el.append("rect").attr("x", x - 1).attr("y", y - ch / 2 - 1).attr("width", n * (cw + 1) + 1).attr("height", ch + 2).attr("rx", 2).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 1);
+  return el;
+}
+function stage(g, x, w, label, sub, op, pulse = 0) {
   const b = g.append("g").attr("opacity", op);
-  b.append("rect").attr("x", x).attr("y", STAGE.y).attr("width", w).attr("height", STAGE.h).attr("rx", 10).attr("fill", "#fff").attr("stroke", pulse > 0 ? ACT : "#c9c9c3").attr("stroke-width", 1.5 + 2 * pulse);
-  b.append("text").attr("x", x + w / 2).attr("y", STAGE.y + 22).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", 600).attr("fill", INK).text(label);
-  if (sub) b.append("text").attr("x", x + w / 2).attr("y", STAGE.y + 37).attr("text-anchor", "middle").attr("font-size", 9.5).attr("fill", MUTED).text(sub);
+  b.append("rect").attr("x", x).attr("y", ST.y).attr("width", w).attr("height", ST.h).attr("rx", 12).attr("fill", "#fff").attr("stroke", pulse > 0 ? ACT : "#c9c9c3").attr("stroke-width", 1.5 + 2 * pulse);
+  b.append("text").attr("x", x + w / 2).attr("y", ST.y + 20).attr("text-anchor", "middle").attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).text(label);
+  if (sub) b.append("text").attr("x", x + w / 2).attr("y", ST.y + 34).attr("text-anchor", "middle").attr("font-size", 9.5).attr("fill", MUTED).text(sub);
   return b;
 }
-const arrow = (g, x1, x2, y, op) => g.append("line").attr("x1", x1).attr("x2", x2).attr("y1", y).attr("y2", y).attr("stroke", "#b5b5b0").attr("stroke-width", 1.5).attr("opacity", op).attr("marker-end", "url(#arrowG)");
-function drawModel(g, S, bi, q, fadeIn) {
-  const defs = g.append("defs");
+const arrowTo = (g, x1, x2, y, op) => g.append("line").attr("x1", x1).attr("x2", x2).attr("y1", y).attr("y2", y).attr("stroke", "#b5b5b0").attr("stroke-width", 1.5).attr("opacity", op).attr("marker-end", "url(#arrowG)");
+// camera: zoom the drawing onto a rectangle (viewBox units)
+const CAM = { over: [0, 0, W, H], emb: [150, 40, 220, 160], prj: [330, 40, 150, 160], enc: [470, 30, 250, 170], pool: [600, 30, 300, 240] };
+function camera(rect) { const [x, y, w, h] = rect, k = Math.min(W / w, H / h); return { k, tx: W / 2 - k * (x + w / 2), ty: H / 2 - k * (y + h / 2) }; }
+const camLerp = (a, b, t) => ({ k: lerp(a.k, b.k, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t) });
+
+function drawModel(gRoot, S, bi, q, fadeIn) {
+  const Bd = window.PRECOG_BUNDLE, idxOf = (rid) => Bd.rollouts.findIndex(r => r.rid === rid);
+  const defs = gRoot.append("defs");
   defs.append("marker").attr("id", "arrowG").attr("viewBox", "0 0 10 10").attr("refX", 9).attr("refY", 5).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto").append("path").attr("d", "M0,0 L10,5 L0,10 z").attr("fill", "#b5b5b0");
-  const op = fadeIn, yC = STAGE.y + STAGE.h / 2 + 10;
-  // which rollout is flowing, and how far
-  let rid, steps, prog, mode;                                   // mode: "one" (beat 4), "many" (beat 5), "query" (beat 6)
-  const focus = S.focus, Q = S.query.r;
-  if (bi === 3) { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(10, steps);     // ten steps slowly, the rest fast-forwarded
-    prog = q < 0.74 ? sub(q, 0.2, 0.74) * slow : slow + sub(q, 0.74, 0.86) * (steps - slow); mode = "one"; }
-  else if (bi === 4) { mode = "many"; }
-  else { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.08, 0.92) * steps; mode = "query"; }
-  // ---- architecture strip
-  g.append("text").attr("x", STAGE.inX).attr("y", STAGE.y - 14).attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).attr("opacity", op).text("Precog-RM");
-  box(g, STAGE.embX, STAGE.embW, "text embedder", "frozen", op);
-  box(g, STAGE.prjX, STAGE.prjW, "projection", "linear", op);
-  const encPulse = mode !== "many" && prog > 0 && prog < steps ? Math.sin(Math.PI * (prog % 1)) : 0;
-  box(g, STAGE.encX, STAGE.encW, "transformer encoder", "2 layers, the whole sequence", op, encPulse);
-  box(g, STAGE.poolX, STAGE.poolW, "mean pool", null, op);
-  [[STAGE.inX + STAGE.inW, STAGE.embX], [STAGE.embX + STAGE.embW, STAGE.prjX], [STAGE.prjX + STAGE.prjW, STAGE.encX], [STAGE.encX + STAGE.encW, STAGE.poolX], [STAGE.poolX + STAGE.poolW, STAGE.zX - 14]].forEach(([a, b]) => arrow(g, a + 2, b - 2, yC - 10, op));
-  g.append("circle").attr("cx", STAGE.zX).attr("cy", yC - 10).attr("r", 9).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2).attr("opacity", op);
-  g.append("text").attr("x", STAGE.zX).attr("y", yC - 6).attr("text-anchor", "middle").attr("font-size", 11).attr("font-style", "italic").attr("fill", INK).attr("opacity", op).text("z");
-  g.append("text").attr("x", 200).attr("y", 440 - 6).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op).text("latent space");
-  // ---- the rollout flowing through (beats 4 and 6)
-  if (mode !== "many") {
-    const ic = S.icons.get(rid) || Q.steps.map(s => actionIcon(s.a)), oc = S.obs.get(rid) || Q.steps.map(s => obsIcon(s.o));
-    const t = Math.min(steps - 1, Math.floor(prog)), f = prog >= steps ? 1 : prog - Math.floor(prog);
-    const slot = (k) => STAGE.inX + 8 + k * 15;
-    for (let k = 0; k < Math.min(steps, 12); k++) if (k > t || (k === t && f > 0.3)) pair(g, slot(k), yC - 10, ic[k], oc[k], 5, op * (k > t ? 0.9 : 0.25));
-    // the current tuple travels: pill -> embedding strip -> projected strip -> into the encoder
-    if (prog > 0 && prog < steps) {
-      const f1 = sub(f, 0, 0.3), f2 = sub(f, 0.3, 0.55), f3 = sub(f, 0.55, 0.8);
-      if (f1 < 1) pair(g, lerp(slot(t), STAGE.embX + 20, ease(f1)), yC - 10, ic[t], oc[t], 5 + 2 * f1, op);
-      else if (f2 < 1) strip(g, lerp(STAGE.embX + STAGE.embW - 50, STAGE.prjX + 10, ease(f2)), yC - 10, rid, t, 10, 4, 14, op);
-      else if (f3 < 1) strip(g, lerp(STAGE.prjX + STAGE.prjW - 36, STAGE.encX + 12, ease(f3)), yC - 10, rid, t, 6, 4, 14, op);
-    }
-    // sequence so far inside the encoder
-    const seen = Math.min(t + (f >= 0.8 || prog >= steps ? 1 : 0), steps);
-    d3.range(seen).forEach(k => strip(g, STAGE.encX + 10 + k * 15, STAGE.y + STAGE.h - 12, rid, k, 3, 3, 8, op));
-    // the point in latent space: settles through the prefix latents; grey until labelled
-    const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-    const moveF = seen === 0 ? 0 : prog >= steps ? 1 : ease(sub(f, 0.8, 1));
-    const cur = seen === 0 ? null : [lerp(from[0], to[0], seen > 1 ? moveF : 1), lerp(from[1], to[1], seen > 1 ? moveF : 1)];
-    if (cur) {
-      g.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", "#777").attr("stroke-width", 1.5).attr("stroke-opacity", 0.6 * op);
-      g.append("path").attr("d", `M${STAGE.zX},${yC} C${STAGE.zX},${yC + 60} ${cur[0]},${cur[1] - 60} ${cur[0]},${cur[1] - 12}`).attr("fill", "none").attr("stroke", "#b5b5b0").attr("stroke-dasharray", "3,3").attr("opacity", op * (seen < steps ? 1 : 0.4));
-    }
-    if (mode === "one") {
-      // beat 4: the label arrives at the end and the point takes its colour
-      const labelled = sub(q, 0.88, 0.95), pass = S.pass.get(rid);
-      if (cur) { g.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 9).attr("fill", labelled > 0 ? d3.interpolateRgb("#9a9a9a", pass ? PASS : FAIL)(labelled) : "#9a9a9a").attr("stroke", "#fff").attr("stroke-width", 2).attr("opacity", op);
-        if (labelled > 0) icon(g, pass ? "circle-check" : "circle-x", cur[0] + 18, cur[1] - 14, 18, pass ? PASS : FAIL, labelled); }
-      g.append("text").attr("x", STAGE.inX).attr("y", yC + 32).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op).text(`rollout 1 · step ${Math.min(seen, steps)} of ${focus.n_steps}`);
-    } else {
-      // beat 6: the new rollout, with the prototypes in place
-      drawPrototypes(g, S, 1, true);
-      if (cur) {
-        const z = S.trails.get(rid), tzi = Math.min(z.length - 1, Math.max(0, seen - 1));
-        [[S.protoP, PASS], [S.protoF, FAIL]].forEach(([pt, col]) => g.append("line").attr("x1", cur[0]).attr("y1", cur[1]).attr("x2", pt[0]).attr("y2", pt[1]).attr("stroke", col).attr("stroke-width", 1.2).attr("stroke-dasharray", "3,3").attr("opacity", op));
-        g.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 11).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2.5); icon(g, "bot", cur[0], cur[1], 13, INK);
-        const zq = window.PRECOG_BUNDLE.encoders.prefix.z[window.PRECOG_BUNDLE.rollouts.findIndex(r => r.rid === rid)];
-        const pNow = S.score(zq[tzi]);
-        const mx = 40, my = 250, bar = d3.scaleLinear().domain([0, 1]).range([my + 110, my + 24]);
-        g.append("rect").attr("x", mx).attr("y", my).attr("width", 110).attr("height", 124).attr("rx", 8).attr("fill", "#fff").attr("stroke", "#e3e3df");
-        g.append("text").attr("x", mx + 10).attr("y", my + 16).attr("font-size", 10).attr("fill", MUTED).text("P(pass)");
-        g.append("rect").attr("x", mx + 10).attr("y", my + 24).attr("width", 20).attr("height", 86).attr("fill", "#f1f1ee");
-        g.append("rect").attr("x", mx + 10).attr("y", bar(pNow)).attr("width", 20).attr("height", my + 110 - bar(pNow)).attr("fill", pNow >= 0.5 ? PASS : FAIL);
-        g.append("line").attr("x1", mx + 8).attr("x2", mx + 32).attr("y1", bar(0.5)).attr("y2", bar(0.5)).attr("stroke", "#999").attr("stroke-dasharray", "2,2");
-        g.append("text").attr("x", mx + 40).attr("y", my + 60).attr("font-size", 18).attr("font-weight", 700).attr("fill", INK).text(pNow.toFixed(2));
-        g.append("text").attr("x", mx + 40).attr("y", my + 78).attr("font-size", 10).attr("fill", MUTED).text(`step ${Math.min(seen, steps)} of ${steps}`);
-        const reveal = sub(q, 0.95, 1), pass = S.pass.get(rid);
-        if (reveal > 0) icon(g, pass ? "circle-check" : "circle-x", cur[0] + 20, cur[1] - 16, 20, pass ? PASS : FAIL, reveal);
-      }
-      g.append("text").attr("x", STAGE.inX).attr("y", yC + 32).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op).text(`a new rollout · step ${Math.min(seen, steps)} of ${steps}`);
-    }
-  } else {
-    // ---- beat 5: the other fifteen labeled rollouts flow through quickly, get their colour, then the prototypes form
-    const others = S.trains.slice(1), per = 0.55 / others.length;
-    const label = ease(sub(q, 0.6, 0.72)), proto = ease(sub(q, 0.76, 1));
-    // rollout 1 is already there and labelled
+  // ---- shots of beat 4
+  let shot = "flow", cam = camera(CAM.over), sq = 0;
+  if (bi === 3) {
+    const shots = [["over", 0, 0.12], ["emb", 0.12, 0.30], ["prj", 0.30, 0.42], ["enc", 0.42, 0.62], ["pool", 0.62, 0.70], ["flow", 0.70, 1]];
+    const i = shots.findIndex(([, a, b]) => q >= a && q < b), cur = shots[Math.max(0, i)];
+    shot = cur[0]; sq = sub(q, cur[1], cur[2]);
+    const target = camera(CAM[shot === "flow" ? "over" : shot]), prev = camera(CAM[i > 0 ? (shots[i - 1][0] === "flow" ? "over" : shots[i - 1][0]) : "over"]);
+    cam = camLerp(prev, target, ease(sub(sq, 0, 0.18)));
+  }
+  const g = gRoot.append("g").attr("transform", `translate(${cam.tx},${cam.ty}) scale(${cam.k})`).attr("opacity", fadeIn);
+  const detail = (name) => shot === name ? ease(sub(sq, 0.18, 0.4)) : 0;          // detail layers fade in once the camera arrives
+  const focus = S.focus, Q = S.query.r, hueIdx = new Map(S.trains.map((r, i) => [r.rid, i]));
+  // ---- the rollout flowing (beat 4 flow shot, beat 6) and its progress
+  let rid = null, steps = 0, prog = 0, mode = bi === 4 ? "many" : bi === 5 ? "query" : "one";
+  if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(10, steps);
+    prog = shot !== "flow" ? 0 : sq < 0.78 ? sub(sq, 0.06, 0.78) * slow : slow + sub(sq, 0.78, 0.9) * (steps - slow); }
+  else if (mode === "query") { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.06, 0.92) * steps; }
+  const hue = mode === "query" ? "#8a8a86" : hueOf(hueIdx.get(rid) ?? 0);
+  const t = Math.min(Math.max(steps - 1, 0), Math.floor(prog)), f = prog >= steps ? 1 : prog - Math.floor(prog);
+  const seen = steps ? Math.min(t + (f >= 0.8 || prog >= steps ? 1 : 0), steps) : 0;
+  // ---- architecture (always drawn)
+  g.append("text").attr("x", ST.qX).attr("y", ST.y - 16).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text("Precog-RM");
+  const encPulse = mode !== "many" && prog > 0 && prog < steps ? Math.sin(Math.PI * f) : 0;
+  stage(g, ST.embX, ST.embW, "embed", "frozen text encoder · 3072-d", 1);
+  stage(g, ST.prjX, ST.prjW, "project", "linear · 128-d", 1);
+  stage(g, ST.encX, ST.encW, "encode", "transformer, 2 layers", 1, encPulse);
+  stage(g, ST.poolX, ST.poolW, "pool", "mean", 1);
+  [[ST.qX + ST.qW, ST.embX], [ST.embX + ST.embW, ST.prjX], [ST.prjX + ST.prjW, ST.encX], [ST.encX + ST.encW, ST.poolX], [ST.poolX + ST.poolW, ST.zX - 12]].forEach(([a, b]) => arrowTo(g, a + 3, b - 3, YC, 1));
+  g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2);
+  g.append("text").attr("x", ST.zX).attr("y", YC + 4).attr("text-anchor", "middle").attr("font-size", 12).attr("font-style", "italic").attr("fill", INK).text("z");
+  // latent panel frame
+  g.append("rect").attr("x", 520).attr("y", 230).attr("width", 365).attr("height", 205).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+  g.append("text").attr("x", 530).attr("y", 246).attr("font-size", 10).attr("fill", MUTED).text("latent space");
+  g.append("path").attr("d", `M${ST.zX},${YC + 12} C${ST.zX},200 ${ST.zX},215 ${ST.zX},230`).attr("fill", "none").attr("stroke", "#b5b5b0").attr("stroke-dasharray", "3,3");
+  // ---- input queue: the rollout's tuples
+  const ic = rid != null ? (S.icons.get(rid) || Q.steps.map(x => actionIcon(x.a))) : null, oc = rid != null ? (S.obs.get(rid) || Q.steps.map(x => obsIcon(x.o))) : null;
+  const slot = (k) => ST.qX + 8 + k * 11;
+  if (mode !== "many" && rid != null) for (let k = 0; k < Math.min(steps, 11); k++) if (k > t || (k === t && f > 0.25) || prog === 0) pair(g, slot(k), YC, ic[k], oc[k], 4, k > t || prog === 0 ? 0.95 : 0.25);
+  // ---- inside the stages: the generic picture (overview) or the current step (flow)
+  const F = S.focusSteps, fs = F[Math.min(t, F.length - 1)];
+  const texts = { a: fs ? fs.at : "", o: fs ? fs.ot : "" };
+  // embed stage: tuple -> two long vectors
+  const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`);
+  const showEmb = shot === "flow" || shot === "over" || mode !== "one" ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
+  pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, showEmb);
+  vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3, showEmb, "a"); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showEmb, "o");
+  inEmb.append("text").attr("x", 140).attr("y", 60).attr("text-anchor", "end").attr("font-size", 7).attr("fill", ACT).text("a");
+  inEmb.append("text").attr("x", 140).attr("y", 80).attr("text-anchor", "end").attr("font-size", 7).attr("fill", OBS).text("o");
+  // project stage: long -> short
+  const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`), showPrj = shot === "flow" || mode !== "one" ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
+  vec(inPrj, 12, 56, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3, showPrj * 0.6, "a"); vec(inPrj, 12, 76, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj * 0.6, "o");
+  inPrj.append("text").attr("x", 55).attr("y", 97).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("W · x + b");
+  vec(inPrj, 78, 56, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3, showPrj, "a"); vec(inPrj, 78, 76, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj, "o");
+  // encode stage: the token row so far (a1 o1 a2 o2 ...) with two layer bands
+  const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`);
+  const nTok = mode === "many" ? 0 : Math.min(2 * seen, 24), tokW = 7, tokGap = 1.5, tokX = (j) => 10 + j * (tokW + tokGap);
+  inEnc.append("rect").attr("x", 8).attr("y", 44).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "#f1f1ee"); inEnc.append("text").attr("x", 14).attr("y", 54).attr("font-size", 7.5).attr("fill", MUTED).text("layer 2");
+  inEnc.append("rect").attr("x", 8).attr("y", 62).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "#f1f1ee"); inEnc.append("text").attr("x", 14).attr("y", 72).attr("font-size", 7.5).attr("fill", MUTED).text("layer 1");
+  for (let j = 0; j < nTok; j++) { const k = Math.floor(j / 2), isA = j % 2 === 0; const tok = inEnc.append("g").attr("transform", `translate(${tokX(j)},88)`);
+    tok.append("rect").attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.55, 0.35 + 0.4 * hash(rid, k, isA ? 1 : 2)).formatHex()).attr("stroke", isA ? ACT : OBS).attr("stroke-width", 0.8); }
+  if (nTok > 0) inEnc.append("text").attr("x", tokX(nTok) + 4).attr("y", 99).attr("font-size", 7.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""}`);
+  if (nTok === 0 && (shot === "enc" || shot === "over" || shot === "pool")) {           // ghost tokens so the zoom-ins have something to attend over
+    for (let j = 0; j < 8; j++) inEnc.append("rect").attr("x", tokX(j)).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.45).attr("stroke", j % 2 === 0 ? ACT : OBS).attr("stroke-width", 0.6);
+    ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].forEach((lab, j) => inEnc.append("text").attr("x", tokX(j) + tokW / 2).attr("y", 110).attr("text-anchor", "middle").attr("font-size", 6).attr("fill", MUTED).attr("opacity", 0.8).text(lab)); }
+  // attention arcs (encoder zoom and while a step is being read)
+  const arcOp = detail("enc") > 0 ? detail("enc") : (encPulse > 0 && f > 0.55 ? encPulse : 0);
+  if (arcOp > 0) { const n = Math.max(nTok, 6); for (let j = 1; j < Math.min(n, 12); j++) { const from = tokX(j) + tokW / 2, to = tokX(Math.max(0, j - 1 - Math.floor(hash(j, 1, 2) * j))) + tokW / 2;
+      inEnc.append("path").attr("d", `M${from},86 Q${(from + to) / 2},${86 - 10 - Math.abs(from - to) * 0.25} ${to},86`).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 0.8).attr("opacity", 0.5 * arcOp); } }
+  // pool stage: tokens collapse into one vector
+  const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`);
+  vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, nTok > 0 || shot === "pool" || shot === "over" ? 1 : 0.35);
+  inPool.append("text").attr("x", ST.poolW / 2).attr("y", 92).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("mean over tokens");
+  // ---- zoom-in detail layers
+  const dEmb = detail("emb");
+  if (dEmb > 0) { const d = g.append("g").attr("opacity", dEmb);
+    const ex = (t_, n) => { t_ = clean(t_); return t_.length > n ? t_.slice(0, n - 1) + "…" : t_; };
+    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", ACT).text(`action:  ${ex(F[0].at, 48)}`);
+    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", OBS).text(`observation:  ${ex(F[0].ot, 48)}`);
+    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 40).attr("font-size", 7).attr("fill", MUTED).text("each text → one 3072-d vector (text-embedding-3-large, frozen)");
+    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 52).attr("font-size", 7).attr("fill", MUTED).text("one tuple → the pair (a, o) · colour = this rollout"); }
+  const dPrj = detail("prj");
+  if (dPrj > 0) { const d = g.append("g").attr("opacity", dPrj);
+    d.append("text").attr("x", ST.prjX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("3072 → 128, one learned linear map");
+    d.append("text").attr("x", ST.prjX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", MUTED).text("shared by actions and observations"); }
+  const dEnc = detail("enc");
+  if (dEnc > 0) { const d = g.append("g").attr("opacity", dEnc);
+    d.append("text").attr("x", ST.encX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("tokens: a1 o1 a2 o2 … the whole history so far, no positions");
+    d.append("text").attr("x", ST.encX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", MUTED).text("self-attention lets each step see the others"); }
+  const dPool = detail("pool");
+  if (dPool > 0) { const d = g.append("g").attr("opacity", dPool);
+    d.append("text").attr("x", ST.poolX - 60).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("mean of the tokens → z (128-d) → a point in latent space"); }
+  // ---- the current tuple travelling between stages (flow shot and beat 6)
+  if (mode !== "many" && prog > 0 && prog < steps) {
+    const f1 = sub(f, 0, 0.25), f2 = sub(f, 0.4, 0.55), f3 = sub(f, 0.6, 0.78);
+    if (f1 < 1) pair(g, lerp(slot(t), ST.embX + 18, ease(f1)), YC, ic[t], oc[t], 4 + f1, 1);
+    if (f > 0.25 && f2 < 1 && f >= 0.4) { const x = lerp(ST.embX + ST.embW - 40, ST.prjX + 12, ease(f2)); vec(g, x, ST.y + 56, 8, 2.6, 8, hue, rid * 7 + t * 3, 1, "a"); vec(g, x, ST.y + 76, 8, 2.6, 8, hue, rid * 7 + t * 3 + 1, 1, "o"); }
+    if (f >= 0.6 && f3 < 1) { const x = lerp(ST.prjX + 78, ST.encX + tokX(2 * t), ease(f3)); vec(g, x, ST.y + 56, 8, 2.6, 8, hue, rid * 7 + t * 3, 1, "a"); vec(g, x + 4, ST.y + 76, 8, 2.6, 8, hue, rid * 7 + t * 3 + 1, 1, "o"); }
+  }
+  // ---- latent panel contents
+  const L = g.append("g");
+  if (mode === "one") {
+    if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.8, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
+      const labelled = shot === "flow" ? sub(sq, 0.92, 0.98) : 0, pass = S.pass.get(rid);
+      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
+      if (labelled > 0) icon(L, pass ? "circle-check" : "circle-x", cur[0] + 16, cur[1] - 12, 16, pass ? PASS : FAIL, labelled);
+      g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`rollout 1 · step ${seen} of ${steps}`); }
+  } else if (mode === "many") {
+    const others = S.trains.slice(1), per = 0.55 / others.length, label = ease(sub(q, 0.6, 0.72)), proto = ease(sub(q, 0.76, 1));
     const p0 = S.latent.get(focus.rid);
-    g.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 7).attr("fill", S.pass.get(focus.rid) ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.5);
-    others.forEach((r, i) => {
-      const f = sub(q, 0.02 + i * per, 0.02 + (i + 1) * per);
-      if (f <= 0) return;
-      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid);
-      if (f < 1) {                                    // compressed flow: queued pills, a strip in the encoder, the point appearing
-        const ic = S.icons.get(r.rid), oc = S.obs.get(r.rid);
-        for (let k = 0; k < Math.min(12, r.n_steps); k++) pair(g, STAGE.inX + 8 + k * 15, yC - 10, ic[k], oc[k], 5, 0.9 * (1 - f));
-        strip(g, lerp(STAGE.embX + 30, STAGE.encX + 20, ease(f)), yC - 10, r.rid, 0, 8, 4, 14, 1);
-        g.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 7 * ease(f)).attr("fill", "#9a9a9a").attr("stroke", "#fff").attr("stroke-width", 1.5);
-      } else {
-        const li = clamp01(label * 1.4 - i * 0.025);
-        g.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 7).attr("fill", d3.interpolateRgb("#9a9a9a", pass ? PASS : FAIL)(li)).attr("stroke", "#fff").attr("stroke-width", 1.5);
-      }
-    });
-    g.append("text").attr("x", STAGE.inX).attr("y", yC + 32).attr("font-size", 10).attr("fill", MUTED).text(`${Math.min(others.length, Math.floor(sub(q, 0.02, 0.57) * others.length)) + 1} of ${S.trains.length} labeled rollouts`);
-    if (proto > 0) drawPrototypes(g, S, proto, false);
+    L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 6.5).attr("fill", S.pass.get(focus.rid) ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.5);
+    let flowing = null;
+    others.forEach((r, i) => { const fI = sub(q, 0.02 + i * per, 0.02 + (i + 1) * per); if (fI <= 0) return;
+      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid), h = hueOf(hueIdx.get(r.rid));
+      if (fI < 1) { flowing = { r, fI, h }; L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5 * ease(fI)).attr("fill", h).attr("stroke", "#fff").attr("stroke-width", 1.5); }
+      else { const li = clamp01(label * 1.4 - i * 0.025); L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5).attr("fill", d3.interpolateRgb(h, pass ? PASS : FAIL)(li)).attr("stroke", "#fff").attr("stroke-width", 1.5); } });
+    if (flowing) { const { r, fI, h } = flowing, icr = S.icons.get(r.rid), ocr = S.obs.get(r.rid);
+      for (let k = 0; k < Math.min(11, r.n_steps); k++) pair(g, slot(k), YC, icr[k], ocr[k], 4, 0.9 * (1 - fI));
+      const x = lerp(ST.embX + 34, ST.encX + 12, ease(fI)); vec(g, x, ST.y + 56, 8, 2.6, 8, h, r.rid * 7, 1, "a"); vec(g, x, ST.y + 76, 8, 2.6, 8, h, r.rid * 7 + 1, 1, "o");
+      for (let j = 0; j < Math.min(24, 2 * r.n_steps); j++) inEnc.append("rect").attr("x", tokX(j)).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(h).h, 0.55, 0.35 + 0.4 * hash(r.rid, j, 1)).formatHex()).attr("opacity", fI); }
+    g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${Math.min(others.length, Math.floor(sub(q, 0.02, 0.57) * others.length)) + 1} of ${S.trains.length} labeled rollouts`);
+    if (proto > 0) drawPrototypes(L, S, proto, false);
+  } else {
+    drawPrototypes(L, S, 1, true);
+    if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.8, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
+      [[S.protoP, PASS], [S.protoF, FAIL]].forEach(([pt, col]) => L.append("line").attr("x1", cur[0]).attr("y1", cur[1]).attr("x2", pt[0]).attr("y2", pt[1]).attr("stroke", col).attr("stroke-width", 1.2).attr("stroke-dasharray", "3,3"));
+      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 10).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2.5); icon(L, "bot", cur[0], cur[1], 12, INK);
+      const pNow = S.score(Bd.encoders.prefix.z[idxOf(rid)][tz]);
+      const mx = 30, my = 240, bar = d3.scaleLinear().domain([0, 1]).range([my + 150, my + 30]);
+      g.append("rect").attr("x", mx).attr("y", my).attr("width", 130).attr("height", 170).attr("rx", 8).attr("fill", "#fff").attr("stroke", "#e3e3df");
+      g.append("text").attr("x", mx + 12).attr("y", my + 18).attr("font-size", 11).attr("fill", MUTED).text("P(pass)");
+      g.append("rect").attr("x", mx + 12).attr("y", my + 30).attr("width", 22).attr("height", 120).attr("fill", "#f1f1ee");
+      g.append("rect").attr("x", mx + 12).attr("y", bar(pNow)).attr("width", 22).attr("height", my + 150 - bar(pNow)).attr("fill", pNow >= 0.5 ? PASS : FAIL);
+      g.append("line").attr("x1", mx + 10).attr("x2", mx + 36).attr("y1", bar(0.5)).attr("y2", bar(0.5)).attr("stroke", "#999").attr("stroke-dasharray", "2,2");
+      g.append("text").attr("x", mx + 46).attr("y", my + 80).attr("font-size", 22).attr("font-weight", 700).attr("fill", INK).text(pNow.toFixed(2));
+      g.append("text").attr("x", mx + 46).attr("y", my + 100).attr("font-size", 10).attr("fill", MUTED).text(`step ${seen} of ${steps}`);
+      const reveal = sub(q, 0.95, 1), pass = S.pass.get(rid);
+      if (reveal > 0) icon(L, pass ? "circle-check" : "circle-x", cur[0] + 18, cur[1] - 14, 18, pass ? PASS : FAIL, reveal);
+      g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`a new rollout · step ${seen} of ${steps}`); }
   }
 }
 function drawPrototypes(g, S, k, withPoints) {
-  if (withPoints) S.sup.forEach(r => { const pt = S.latent.get(r.rid); g.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6).attr("fill", S.pass.get(r.rid) ? PASS : FAIL).attr("fill-opacity", 0.8).attr("stroke", "#fff").attr("stroke-width", 1.2); });
+  if (withPoints) S.sup.forEach(r => { const pt = S.latent.get(r.rid); g.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 5.5).attr("fill", S.pass.get(r.rid) ? PASS : FAIL).attr("fill-opacity", 0.8).attr("stroke", "#fff").attr("stroke-width", 1.2); });
   [[S.hullP, PASS, S.protoP, "circle-check"], [S.hullF, FAIL, S.protoF, "circle-x"]].forEach(([h, col, pt, ic]) => {
     const c = d3.polygonCentroid(h);
     g.append("path").attr("d", d3.line().curve(d3.curveCatmullRomClosed.alpha(0.6))(h.map(p => [lerp(c[0], p[0], k), lerp(c[1], p[1], k)]))).attr("fill", col).attr("fill-opacity", 0.09).attr("stroke", col).attr("stroke-opacity", 0.45).attr("stroke-dasharray", "4,3");
     if (!withPoints) S.sup.filter(r => (S.pass.get(r.rid) ? PASS : FAIL) === col).forEach(r => { const p = S.latent.get(r.rid);
       g.append("line").attr("x1", p[0]).attr("y1", p[1]).attr("x2", lerp(p[0], pt[0], k)).attr("y2", lerp(p[1], pt[1], k)).attr("stroke", col).attr("stroke-opacity", 0.35 * (1 - k * 0.6)); });
-    g.append("path").attr("d", d3.symbol(d3.symbolStar, 320)()).attr("transform", `translate(${pt[0]},${pt[1]}) scale(${k})`).attr("fill", col).attr("stroke", "#fff").attr("stroke-width", 1.5);
-    icon(g, ic, pt[0] + 18, pt[1] - 14, 16, col, k);
+    g.append("path").attr("d", d3.symbol(d3.symbolStar, 260)()).attr("transform", `translate(${pt[0]},${pt[1]}) scale(${k})`).attr("fill", col).attr("stroke", "#fff").attr("stroke-width", 1.5);
+    icon(g, ic, pt[0] + 16, pt[1] - 12, 14, col, k);
   });
 }
 

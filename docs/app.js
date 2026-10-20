@@ -201,7 +201,7 @@ function drawScoring(resetT = true) {
   const qs = queries.map(r => score(zFinal(idx.get(r.rid)))), ql = queries.map(r => pass.get(r.rid));
   const au = auroc(qs, ql);
   const setN3 = (items) => { const el = $("#n3"); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
-  setN3([["128-d", "latent per rollout or prefix"], ["2 prototypes", "means of the support passes and failures"], ["0 params", "fit at inference"], [isNaN(au) ? "n/a" : fmt3(au), `held-out AUROC on ${B.task_id} under this support set`]]);
+  setN3([[S.encoder === "raw" ? `${E.z[0][0].length}-d` : "128-d", S.encoder === "raw" ? "raw pooled embedding (reduced for the browser)" : "latent per rollout or prefix"], ["2 prototypes", "means of the support passes and failures"], ["0 params", "fit at inference"], [isNaN(au) ? "n/a" : fmt3(au), `held-out AUROC on ${B.task_id} under this support set`]]);
   $("#score-badges").innerHTML = `<span class="badge">support: ${supP.length} pass + ${supF.length} fail</span><span class="badge">${queries.length} queries</span><span class="badge">AUROC ${isNaN(au) ? "n/a" : fmt3(au)}</span>${B.held_out ? "" : `<span class="badge warn">training-pool task</span>`}`;
   // selected rollout + prefix slider
   const sel = rolls[idx.get(S.sel)], zs = E.z[idx.get(S.sel)];
@@ -244,7 +244,7 @@ function drawLatent(E, rolls, idx, pass, cp, cf, score, zs) {
   const x = d3.scaleLinear().domain(pad(d3.extent(pts, p => p.x))).range([m, W - m]), y = d3.scaleLinear().domain(pad(d3.extent(pts, p => p.y))).range([H - m, m]);
   svg.append("clipPath").attr("id", "latent-clip").append("rect").attr("x", 0).attr("y", 0).attr("width", W).attr("height", H);
   svg.attr("clip-path", "url(#latent-clip)");
-  svg.append("text").attr("x", m).attr("y", H - 8).attr("font-size", 11).attr("fill", "#6b6b6b").text(`PCA of the ${E.checkpoint.replace(".pt", "")} latent (128-d), fitted on this task's ${rolls.length} full rollouts · explains ${Math.round((E.pca.explained[0] + E.pca.explained[1]) * 100)}% of variance`);
+  svg.append("text").attr("x", m).attr("y", H - 8).attr("font-size", 11).attr("fill", "#6b6b6b").text((S.encoder === "raw" ? `PCA of the raw action–observation space (mean-pooled text-embedding-3-large, ${E.z[0][0].length} PCs)` : `PCA of the ${E.checkpoint.replace(".pt", "")} latent (128-d)`) + `, fitted on this task's ${rolls.length} full rollouts · explains ${Math.round((E.pca.explained[0] + E.pca.explained[1]) * 100)}% of variance`);
   // trail of the selected rollout's prefixes
   if (trail.length > 1) {
     svg.append("path").attr("d", d3.line().x(d => x(d[0])).y(d => y(d[1]))(trail.slice(0, S.t))).attr("fill", "none").attr("stroke", "#333").attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);

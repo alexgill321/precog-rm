@@ -162,7 +162,8 @@ function drawModel(g, S, bi, q, fadeIn) {
   // which rollout is flowing, and how far
   let rid, steps, prog, mode;                                   // mode: "one" (beat 4), "many" (beat 5), "query" (beat 6)
   const focus = S.focus, Q = S.query.r;
-  if (bi === 3) { rid = focus.rid; steps = Math.min(10, focus.n_steps); prog = sub(q, 0.2, 0.82) * steps; mode = "one"; }
+  if (bi === 3) { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(10, steps);     // ten steps slowly, the rest fast-forwarded
+    prog = q < 0.74 ? sub(q, 0.2, 0.74) * slow : slow + sub(q, 0.74, 0.86) * (steps - slow); mode = "one"; }
   else if (bi === 4) { mode = "many"; }
   else { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.08, 0.92) * steps; mode = "query"; }
   // ---- architecture strip
@@ -202,7 +203,7 @@ function drawModel(g, S, bi, q, fadeIn) {
     }
     if (mode === "one") {
       // beat 4: the label arrives at the end and the point takes its colour
-      const labelled = sub(q, 0.86, 0.94), pass = S.pass.get(rid);
+      const labelled = sub(q, 0.88, 0.95), pass = S.pass.get(rid);
       if (cur) { g.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 9).attr("fill", labelled > 0 ? d3.interpolateRgb("#9a9a9a", pass ? PASS : FAIL)(labelled) : "#9a9a9a").attr("stroke", "#fff").attr("stroke-width", 2).attr("opacity", op);
         if (labelled > 0) icon(g, pass ? "circle-check" : "circle-x", cur[0] + 18, cur[1] - 14, 18, pass ? PASS : FAIL, labelled); }
       g.append("text").attr("x", STAGE.inX).attr("y", yC + 32).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op).text(`rollout 1 · step ${Math.min(seen, steps)} of ${focus.n_steps}`);

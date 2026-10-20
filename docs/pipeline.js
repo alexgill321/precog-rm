@@ -146,7 +146,7 @@ function render(p) {
 }
 
 // ---------- beats 4-6: the model ----------
-const ST = { qX: 28, qW: 120, embX: 165, embW: 150, prjX: 345, prjW: 110, encX: 485, encW: 215, poolX: 730, poolW: 68, zX: 846, y: 58, h: 112 };
+const ST = { qX: 28, qW: 120, embX: 165, embW: 150, prjX: 345, prjW: 110, encX: 485, encW: 215, poolX: 730, poolW: 68, zX: 846, y: 44, h: 160 };
 const YC = ST.y + ST.h / 2;
 const hueOf = (i) => d3.hsl((360 * i / LANES + 200) % 360, 0.6, 0.5).formatHex();
 const hash = (a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1;
@@ -155,6 +155,13 @@ function vec(g, x, y, n, cw, ch, hue, seed, op = 1, kind = null, shown = n) {
   const el = g.append("g").attr("opacity", op), base = d3.hsl(hue);
   d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x + k * (cw + 1)).attr("y", y - ch / 2).attr("width", cw).attr("height", ch).attr("rx", 1).attr("fill", k < shown ? c.formatHex() : "#eceae5"); });
   if (kind) el.append("rect").attr("x", x - 1).attr("y", y - ch / 2 - 1).attr("width", n * (cw + 1) + 1).attr("height", ch + 2).attr("rx", 2).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 1);
+  return el;
+}
+// a vector drawn as a vertical column of cells (top at yTop), in the rollout's hue
+function vcol(g, x, yTop, n, cw, ch, hue, seed, op = 1, kind = null, shown = n, gap = 0.6) {
+  const el = g.append("g").attr("opacity", op), base = d3.hsl(hue);
+  d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x - cw / 2).attr("y", yTop + k * (ch + gap)).attr("width", cw).attr("height", ch).attr("fill", k < shown ? c.formatHex() : "#eceae5"); });
+  if (kind) el.append("rect").attr("x", x - cw / 2 - 1).attr("y", yTop - 1).attr("width", cw + 2).attr("height", n * (ch + gap) + 1).attr("rx", 1.5).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 0.8);
   return el;
 }
 function stage(g, x, w, label, sub, op, pulse = 0) {
@@ -166,7 +173,7 @@ function stage(g, x, w, label, sub, op, pulse = 0) {
 }
 const arrowTo = (g, x1, x2, y, op) => g.append("line").attr("x1", x1).attr("x2", x2).attr("y1", y).attr("y2", y).attr("stroke", "#b5b5b0").attr("stroke-width", 1.5).attr("opacity", op).attr("marker-end", "url(#arrowG)");
 // camera: zoom the drawing onto a rectangle (viewBox units)
-const CAM = { over: [0, 0, W, H], emb: [150, 40, 220, 160], prj: [330, 40, 150, 160], enc: [470, 30, 250, 170], pool: [600, 30, 300, 240] };
+const CAM = { over: [0, 0, W, H], emb: [150, 30, 190, 200], prj: [330, 30, 150, 200], enc: [470, 20, 250, 210], pool: [620, 20, 280, 260] };
 function camera(rect) { const [x, y, w, h] = rect, k = Math.min(W / w, H / h); return { k, tx: W / 2 - k * (x + w / 2), ty: H / 2 - k * (y + h / 2) }; }
 const camLerp = (a, b, t) => ({ k: lerp(a.k, b.k, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t) });
 
@@ -206,104 +213,91 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2);
   g.append("text").attr("x", ST.zX).attr("y", YC + 4).attr("text-anchor", "middle").attr("font-size", 12).attr("font-style", "italic").attr("fill", INK).text("z");
   // latent panel frame
-  g.append("rect").attr("x", 520).attr("y", 230).attr("width", 365).attr("height", 205).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+  g.append("rect").attr("x", 520).attr("y", 232).attr("width", 365).attr("height", 203).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
   g.append("text").attr("x", 530).attr("y", 246).attr("font-size", 10).attr("fill", MUTED).text("latent space");
-  g.append("path").attr("d", `M${ST.zX},${YC + 12} C${ST.zX},200 ${ST.zX},215 ${ST.zX},230`).attr("fill", "none").attr("stroke", "#b5b5b0").attr("stroke-dasharray", "3,3");
+  g.append("path").attr("d", `M${ST.zX},${YC + 12} C${ST.zX},210 ${ST.zX},220 ${ST.zX},232`).attr("fill", "none").attr("stroke", "#b5b5b0").attr("stroke-dasharray", "3,3");
   // ---- input queue: the rollout's tuples
   const ic = rid != null ? (S.icons.get(rid) || Q.steps.map(x => actionIcon(x.a))) : null, oc = rid != null ? (S.obs.get(rid) || Q.steps.map(x => obsIcon(x.o))) : null;
   const slot = (k) => ST.qX + 8 + k * 11;
   if (mode !== "many" && rid != null) for (let k = 0; k < Math.min(steps, 11); k++) if (k > t || (k === t && f > 0.25) || prog === 0) pair(g, slot(k), YC, ic[k], oc[k], 4, k > t || prog === 0 ? 0.95 : 0.25);
-  // ---- inside the stages: the generic picture (overview) or the current step (flow)
+  // ---- inside the stages: vectors as they are actually processed
   const F = S.focusSteps, fs = F[Math.min(t, F.length - 1)];
-  const texts = { a: fs ? fs.at : "", o: fs ? fs.ot : "" };
-  // embed stage: tuple -> two long vectors
+  const seedA = (rid ?? 0) * 7 + t * 3, seedO = seedA + 1, hueOfTok = (k, isA) => d3.hsl(d3.hsl(hue).h, 0.55, 0.35 + 0.4 * hash(rid ?? 0, k, isA ? 1 : 2)).formatHex();
+  const TALL = { n: 30, cw: 9, ch: 2.6, gap: 0.6 }, SHORT = { n: 8, cw: 9, ch: 4.6, gap: 1 };
+  const tallH = TALL.n * (TALL.ch + TALL.gap), shortH = SHORT.n * (SHORT.ch + SHORT.gap);
+  const ex = (t_, n) => { t_ = clean(t_); return t_.length > n ? t_.slice(0, n - 1) + "…" : t_; };
+  // -- embed: texts in, two tall columns out (a and o are separate tokens)
   const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`);
-  const showEmb = shot === "flow" || shot === "over" || mode !== "one" ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
-  if (shot === "emb" && anim != null) {                                           // zoom-in: the tuple arrives, then its two vectors fill in cell by cell
-    const arrive = ease(sub(anim, 0, 0.22)), fillA = sub(anim, 0.3, 0.62), fillO = sub(anim, 0.5, 0.82);
-    if (arrive < 1) pair(g, lerp(slot(0), ST.embX + 18, arrive), YC + 2 + lerp(0, 0, arrive), fs ? fs.ai : "message-square", fs ? fs.oi : "user", 4 + arrive, 1);
-    else pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, 1);
-    vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7, 1, "a", Math.round(24 * fillA)); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + 1, 1, "o", Math.round(24 * fillO));
-    if (fillA > 0 && fillA < 1) inEmb.append("rect").attr("x", 34 + Math.round(24 * fillA) * 4.2).attr("y", 50).attr("width", 2).attr("height", 12).attr("fill", ACT);
-    if (fillO > 0 && fillO < 1) inEmb.append("rect").attr("x", 34 + Math.round(24 * fillO) * 4.2).attr("y", 70).attr("width", 2).attr("height", 12).attr("fill", OBS);
-  } else {
-    pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, showEmb);
-    vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3, showEmb, "a"); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showEmb, "o");
-  }
-  inEmb.append("text").attr("x", 140).attr("y", 60).attr("text-anchor", "end").attr("font-size", 7).attr("fill", ACT).text("a");
-  inEmb.append("text").attr("x", 140).attr("y", 80).attr("text-anchor", "end").attr("font-size", 7).attr("fill", OBS).text("o");
-  // project stage: long -> short
-  const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`), showPrj = shot === "flow" || mode !== "one" ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
-  inPrj.append("text").attr("x", 55).attr("y", 97).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("W · x + b");
-  if (shot === "prj" && anim != null) {                                            // zoom-in: the long vectors squeeze into the short ones
-    const sq_ = ease(sub(anim, 0.1, 0.6)), out = sub(anim, 0.45, 0.9);
-    [[56, "a", 0], [76, "o", 1]].forEach(([y, kind, off]) => {
-      const cw = lerp(1.6, 0.5, sq_), x0 = lerp(12, 48, sq_);
-      vec(inPrj, x0, y, 24, cw, 7, hue, (rid ?? 0) * 7 + off, 1 - 0.5 * sq_, kind);
-      vec(inPrj, 78, y, 8, 2.6, 8, hue, (rid ?? 0) * 7 + off, 1, kind, Math.round(8 * out)); });
-    inPrj.append("rect").attr("x", 40).attr("y", 46).attr("width", 34).attr("height", 40).attr("rx", 4).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1).attr("opacity", Math.sin(Math.PI * sq_));
-    inPrj.append("text").attr("x", 57).attr("y", 44).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", ACT).attr("opacity", Math.sin(Math.PI * sq_)).text("W");
-  } else {
-    vec(inPrj, 12, 56, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3, showPrj * 0.6, "a"); vec(inPrj, 12, 76, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj * 0.6, "o");
-    vec(inPrj, 78, 56, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3, showPrj, "a"); vec(inPrj, 78, 76, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj, "o");
-  }
-  // encode stage: the token row so far (a1 o1 a2 o2 ...) with two layer bands
+  const embA = ST.embW - 50, embO = ST.embW - 24, colTop = 46;
+  const embAct = shot === "emb" && anim != null ? { arrive: ease(sub(anim, 0, 0.2)), fa: sub(anim, 0.25, 0.6), fo: sub(anim, 0.45, 0.8) } : null;
+  const embOp = embAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
+  inEmb.append("text").attr("x", 10).attr("y", 50).attr("font-size", 6).attr("fill", ACT).attr("opacity", embOp).text(ex(fs ? fs.at : "", 22));
+  inEmb.append("text").attr("x", 10).attr("y", 60).attr("font-size", 6).attr("fill", OBS).attr("opacity", embOp).text(ex(fs ? fs.ot : "", 22));
+  inEmb.append("text").attr("x", 10).attr("y", 74).attr("font-size", 6).attr("fill", MUTED).attr("opacity", embOp).text("text → vector");
+  arrowTo(inEmb, 60, embA - 12, 98, embOp * 0.8);
+  inEmb.append("text").attr("x", embA).attr("y", colTop - 6).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", ACT).text("a");
+  inEmb.append("text").attr("x", embO).attr("y", colTop - 6).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", OBS).text("o");
+  vcol(inEmb, embA, colTop, TALL.n, TALL.cw, TALL.ch, hue, seedA, embOp, "a", embAct ? Math.round(TALL.n * embAct.fa) : TALL.n, TALL.gap);
+  vcol(inEmb, embO, colTop, TALL.n, TALL.cw, TALL.ch, hue, seedO, embOp, "o", embAct ? Math.round(TALL.n * embAct.fo) : TALL.n, TALL.gap);
+  inEmb.append("text").attr("x", (embA + embO) / 2).attr("y", colTop + tallH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("3072-d each");
+  if (embAct && embAct.arrive < 1) pair(g, lerp(slot(0), ST.embX + 24, embAct.arrive), YC, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 4 + embAct.arrive, 1);
+  // -- project: tall columns squeezed through W into short ones
+  const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`);
+  const prjAct = shot === "prj" && anim != null ? { sq: ease(sub(anim, 0.1, 0.6)), out: sub(anim, 0.45, 0.9) } : null;
+  const prjOp = prjAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
+  const sqz = prjAct ? prjAct.sq : 0, tallTop = 46, shortTop = 46 + (tallH - shortH) / 2;
+  [[14, "a", seedA], [28, "o", seedO]].forEach(([x, kind, seed]) => { const hcell = lerp(TALL.ch, 1.2, sqz), hgap = lerp(TALL.gap, 0.3, sqz);
+    vcol(inPrj, lerp(x, 40, sqz), lerp(tallTop, shortTop + 8, sqz), TALL.n, lerp(6, 4, sqz), hcell, hue, seed, prjOp * (1 - 0.5 * sqz), kind, TALL.n, hgap); });
+  inPrj.append("rect").attr("x", 44).attr("y", shortTop - 6).attr("width", 22).attr("height", shortH + 12).attr("rx", 3).attr("fill", "#fff").attr("stroke", prjAct ? ACT : "#c9c9c3").attr("stroke-width", prjAct ? 1 + Math.sin(Math.PI * sqz) : 1);
+  inPrj.append("text").attr("x", 55).attr("y", shortTop + shortH / 2 + 3).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", INK).text("W");
+  arrowTo(inPrj, 68, 76, shortTop + shortH / 2, prjOp);
+  [[84, "a", seedA], [98, "o", seedO]].forEach(([x, kind, seed]) => vcol(inPrj, x, shortTop, SHORT.n, SHORT.cw, SHORT.ch, hue, seed, prjOp, kind, prjAct ? Math.round(SHORT.n * prjAct.out) : SHORT.n, SHORT.gap));
+  inPrj.append("text").attr("x", 91).attr("y", shortTop + shortH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("128-d");
+  inPrj.append("text").attr("x", 21).attr("y", tallTop + tallH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).attr("opacity", 1 - sqz).text("3072-d");
+  // -- encode: a row of token columns under two horizontal layers of nodes, fully connected
   const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`);
-  const nTok = mode === "many" ? 0 : Math.min(2 * seen, 24), tokW = 7, tokGap = 1.5, tokX = (j) => 10 + j * (tokW + tokGap);
-  inEnc.append("rect").attr("x", 8).attr("y", 44).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "#f1f1ee"); inEnc.append("text").attr("x", 14).attr("y", 54).attr("font-size", 7.5).attr("fill", MUTED).text("layer 2");
-  inEnc.append("rect").attr("x", 8).attr("y", 62).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "#f1f1ee"); inEnc.append("text").attr("x", 14).attr("y", 72).attr("font-size", 7.5).attr("fill", MUTED).text("layer 1");
-  for (let j = 0; j < nTok; j++) { const k = Math.floor(j / 2), isA = j % 2 === 0; const tok = inEnc.append("g").attr("transform", `translate(${tokX(j)},88)`);
-    tok.append("rect").attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.55, 0.35 + 0.4 * hash(rid, k, isA ? 1 : 2)).formatHex()).attr("stroke", isA ? ACT : OBS).attr("stroke-width", 0.8); }
-  if (nTok > 0) inEnc.append("text").attr("x", tokX(nTok) + 4).attr("y", 99).attr("font-size", 7.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""}`);
-  let ghosts = 0;
-  if (nTok === 0 && (shot === "enc" || shot === "over" || shot === "pool")) {           // ghost tokens: in the encoder zoom-in they arrive pair by pair
-    const arr = shot === "enc" && anim != null ? sub(anim, 0, 0.6) * 8 : 8; ghosts = Math.min(8, Math.ceil(arr));
-    for (let j = 0; j < ghosts; j++) { const slide = shot === "enc" && anim != null ? clamp01(arr - j) : 1;
-      inEnc.append("rect").attr("x", lerp(tokX(j) - 40, tokX(j), ease(slide))).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.45 + 0.4 * slide).attr("stroke", j % 2 === 0 ? ACT : OBS).attr("stroke-width", 0.6); }
-    ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].slice(0, ghosts).forEach((lab, j) => inEnc.append("text").attr("x", tokX(j) + tokW / 2).attr("y", 110).attr("text-anchor", "middle").attr("font-size", 6).attr("fill", MUTED).attr("opacity", 0.8).text(lab));
-    if (shot === "enc" && anim != null) { const lp = sub(anim, 0.6, 1); [62, 44].forEach((y, li) => { const on = Math.sin(Math.PI * clamp01(lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", 8).attr("y", y).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); }); } }
-  // attention arcs (encoder zoom and while a step is being read)
-  const arcOp = detail("enc") > 0 ? detail("enc") * (anim != null ? sub(anim, 0.15, 0.4) : 1) : (encPulse > 0 && f > 0.55 ? encPulse : 0);
-  if (arcOp > 0) { const n = nTok > 0 ? nTok : ghosts; for (let j = 1; j < Math.min(n, 12); j++) { const from = tokX(j) + tokW / 2, to = tokX(Math.max(0, j - 1 - Math.floor(hash(j, 1, 2) * j))) + tokW / 2;
-      inEnc.append("path").attr("d", `M${from},86 Q${(from + to) / 2},${86 - 10 - Math.abs(from - to) * 0.25} ${to},86`).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 0.8).attr("opacity", 0.5 * arcOp); } }
-  // pool stage: tokens collapse into one vector
+  const encAct = shot === "enc" && anim != null ? { arr: sub(anim, 0, 0.55) * 8, lines: sub(anim, 0.3, 0.7), lp: sub(anim, 0.6, 1) } : null;
+  const nTokReal = mode === "many" ? 0 : Math.min(2 * seen, 24);
+  const ghosts = nTokReal === 0 && (shot === "enc" || shot === "over" || shot === "pool") ? (encAct ? Math.min(8, Math.ceil(encAct.arr)) : 8) : 0;
+  const nTok = nTokReal || ghosts, tokW = 6, tokX = (j) => 12 + j * 8.2, tokTop = ST.h - 40, tokCell = 3, L1Y = 92, L2Y = 60;
+  const nodeX = (j) => tokX(j), nodes = Math.max(nTok, 1);
+  // connections: every token to every layer-1 node, every layer-1 node to every layer-2 node
+  const linesOp = encAct ? 0.07 * encAct.lines : (shot === "over" || shot === "pool" || nTokReal > 0 ? 0.07 : 0);
+  if (linesOp > 0 && nTok > 0) for (let j = 0; j < nTok; j++) for (let k = 0; k < nTok; k++) {
+    inEnc.append("line").attr("x1", tokX(j)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 3).attr("stroke", INK).attr("stroke-opacity", linesOp);
+    inEnc.append("line").attr("x1", nodeX(j)).attr("y1", L1Y - 3).attr("x2", nodeX(k)).attr("y2", L2Y + 3).attr("stroke", INK).attr("stroke-opacity", linesOp); }
+  // the current token's connections light up while it is read
+  const hot = encPulse > 0 && f > 0.55 ? encPulse : (encAct ? Math.sin(Math.PI * clamp01(encAct.arr - Math.floor(encAct.arr))) * (encAct.arr < 8 ? 1 : 0) : 0);
+  const hotJ = encAct ? Math.min(nTok - 1, Math.floor(encAct.arr)) : nTok - 1;
+  if (hot > 0 && hotJ >= 0) for (let k = 0; k < nTok; k++) inEnc.append("line").attr("x1", tokX(hotJ)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 3).attr("stroke", hue).attr("stroke-width", 1).attr("stroke-opacity", 0.6 * hot);
+  for (let j = 0; j < nTok; j++) {
+    const isA = j % 2 === 0, slide = encAct ? clamp01(encAct.arr - j) : 1, tokHue = hueOfTok(Math.floor(j / 2), isA);
+    const x = lerp(tokX(j) - 30, tokX(j), ease(slide));
+    vcol(inEnc, x, tokTop, SHORT.n, tokW, tokCell, tokHue, (rid ?? 0) * 7 + j, (ghosts ? 0.5 : 1) * (0.3 + 0.7 * slide), isA ? "a" : "o", SHORT.n, 0.4);
+    inEnc.append("circle").attr("cx", nodeX(j)).attr("cy", L1Y).attr("r", 3).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 0.8).attr("opacity", 0.4 + 0.6 * slide);
+    inEnc.append("circle").attr("cx", nodeX(j)).attr("cy", L2Y).attr("r", 3).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 0.8).attr("opacity", 0.4 + 0.6 * slide);
+  }
+  if (ghosts) ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].slice(0, ghosts).forEach((lab, j) => inEnc.append("text").attr("x", tokX(j)).attr("y", ST.h - 6).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", MUTED).text(lab));
+  if (nTokReal) inEnc.append("text").attr("x", tokX(nTok - 1) + 10).attr("y", tokTop + 20).attr("font-size", 6.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""}`);
+  inEnc.append("text").attr("x", ST.encW - 8).attr("y", L1Y + 3).attr("text-anchor", "end").attr("font-size", 6.5).attr("fill", MUTED).text("layer 1");
+  inEnc.append("text").attr("x", ST.encW - 8).attr("y", L2Y + 3).attr("text-anchor", "end").attr("font-size", 6.5).attr("fill", MUTED).text("layer 2");
+  if (encAct) [L1Y, L2Y].forEach((y, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", 6).attr("y", y - 7).attr("width", ST.encW - 12).attr("height", 14).attr("rx", 7).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1).attr("opacity", on); });
+  // -- pool: the layer-2 outputs average into one 128-d column, z
   const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`);
-  inPool.append("text").attr("x", ST.poolW / 2).attr("y", 92).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("mean over tokens");
-  if (shot === "pool" && anim != null) {                                           // zoom-in: the tokens slide in and average into one vector; z drops into the panel
-    const merge = ease(sub(anim, 0, 0.45)), drop = ease(sub(anim, 0.55, 1));
-    for (let j = 0; j < 8; j++) { const x0 = ST.encX + tokX(j), x1 = ST.poolX + 10 + j * 6.2, y0 = ST.y + 95, y1 = ST.y + 70;
-      g.append("rect").attr("x", lerp(x0, x1, merge)).attr("y", lerp(y0, y1, merge) - 5).attr("width", lerp(tokW, 5.2, merge)).attr("height", lerp(14, 10, merge)).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.85 * (1 - merge)); }
-    vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, merge);
-    if (drop > 0) { const tr = S.trails.get(focus.rid), dst = tr[0];
-      const px = lerp(ST.zX, dst[0], drop), py = lerp(YC + 12, dst[1], drop);
-      g.append("circle").attr("cx", px).attr("cy", py).attr("r", 7).attr("fill", hue).attr("stroke", "#fff").attr("stroke-width", 1.5); }
-    g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10 + 4 * Math.sin(Math.PI * sub(anim, 0.45, 0.6))).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("opacity", Math.sin(Math.PI * sub(anim, 0.45, 0.6)));
-  } else vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, nTok > 0 || shot === "over" ? 1 : 0.35);
-  // ---- zoom-in detail layers
-  const dEmb = detail("emb");
-  if (dEmb > 0) { const d = g.append("g").attr("opacity", dEmb);
-    const ex = (t_, n) => { t_ = clean(t_); return t_.length > n ? t_.slice(0, n - 1) + "…" : t_; };
-    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", ACT).text(`action:  ${ex(F[0].at, 48)}`);
-    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", OBS).text(`observation:  ${ex(F[0].ot, 48)}`);
-    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 40).attr("font-size", 7).attr("fill", MUTED).text("each text → one 3072-d vector (text-embedding-3-large, frozen)");
-    d.append("text").attr("x", ST.embX + 6).attr("y", ST.y + ST.h + 52).attr("font-size", 7).attr("fill", MUTED).text("one tuple → the pair (a, o) · colour = this rollout"); }
-  const dPrj = detail("prj");
-  if (dPrj > 0) { const d = g.append("g").attr("opacity", dPrj);
-    d.append("text").attr("x", ST.prjX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("3072 → 128, one learned linear map");
-    d.append("text").attr("x", ST.prjX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", MUTED).text("shared by actions and observations"); }
-  const dEnc = detail("enc");
-  if (dEnc > 0) { const d = g.append("g").attr("opacity", dEnc);
-    d.append("text").attr("x", ST.encX + 6).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("tokens: a1 o1 a2 o2 … the whole history so far, no positions");
-    d.append("text").attr("x", ST.encX + 6).attr("y", ST.y + ST.h + 26).attr("font-size", 7).attr("fill", MUTED).text("self-attention lets each step see the others"); }
-  const dPool = detail("pool");
-  if (dPool > 0) { const d = g.append("g").attr("opacity", dPool);
-    d.append("text").attr("x", ST.poolX - 60).attr("y", ST.y + ST.h + 14).attr("font-size", 7).attr("fill", MUTED).text("mean of the tokens → z (128-d) → a point in latent space"); }
-  // ---- the current tuple travelling between stages (flow shot and beat 6)
+  const poolAct = shot === "pool" && anim != null ? { merge: ease(sub(anim, 0, 0.45)), drop: ease(sub(anim, 0.55, 1)) } : null;
+  const zTop = 46 + (tallH - shortH) / 2;
+  if (poolAct) { for (let j = 0; j < 8; j++) { const x0 = ST.encX + nodeX(j), x1 = ST.poolX + ST.poolW / 2, y0 = ST.y + L2Y, y1 = ST.y + zTop + shortH / 2;
+      g.append("circle").attr("cx", lerp(x0, x1, poolAct.merge)).attr("cy", lerp(y0, y1, poolAct.merge)).attr("r", 3).attr("fill", hue).attr("opacity", 0.8 * (1 - poolAct.merge)); } }
+  vcol(inPool, ST.poolW / 2, zTop, SHORT.n, SHORT.cw, SHORT.ch, hue, (rid ?? 0) * 7 + 99, poolAct ? poolAct.merge : (nTokReal > 0 || shot === "over" ? 1 : 0.35), null, SHORT.n, SHORT.gap);
+  inPool.append("text").attr("x", ST.poolW / 2).attr("y", zTop + shortH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("mean · 128-d");
+  if (poolAct && poolAct.drop > 0) { const dst = S.trails.get(focus.rid)[0]; g.append("circle").attr("cx", lerp(ST.zX, dst[0], poolAct.drop)).attr("cy", lerp(YC + 12, dst[1], poolAct.drop)).attr("r", 7).attr("fill", hue).attr("stroke", "#fff").attr("stroke-width", 1.5); }
+  if (poolAct) g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10 + 4 * Math.sin(Math.PI * sub(anim, 0.45, 0.6))).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("opacity", Math.sin(Math.PI * sub(anim, 0.45, 0.6)));
+  // ---- the current tuple travelling between stages (flow shot, beat 6)
   if (mode !== "many" && prog > 0 && prog < steps) {
-    const f1 = sub(f, 0, 0.25), f2 = sub(f, 0.4, 0.55), f3 = sub(f, 0.6, 0.78);
-    if (f1 < 1) pair(g, lerp(slot(t), ST.embX + 18, ease(f1)), YC, ic[t], oc[t], 4 + f1, 1);
-    if (f > 0.25 && f2 < 1 && f >= 0.4) { const x = lerp(ST.embX + ST.embW - 40, ST.prjX + 12, ease(f2)); vec(g, x, ST.y + 56, 8, 2.6, 8, hue, rid * 7 + t * 3, 1, "a"); vec(g, x, ST.y + 76, 8, 2.6, 8, hue, rid * 7 + t * 3 + 1, 1, "o"); }
-    if (f >= 0.6 && f3 < 1) { const x = lerp(ST.prjX + 78, ST.encX + tokX(2 * t), ease(f3)); vec(g, x, ST.y + 56, 8, 2.6, 8, hue, rid * 7 + t * 3, 1, "a"); vec(g, x + 4, ST.y + 76, 8, 2.6, 8, hue, rid * 7 + t * 3 + 1, 1, "o"); }
+    const f1 = sub(f, 0, 0.25), f3 = sub(f, 0.55, 0.78);
+    if (f1 < 1) pair(g, lerp(slot(t), ST.embX + 24, ease(f1)), YC, ic[t], oc[t], 4 + f1, 1);
+    if (f >= 0.55 && f3 < 1) [[0, "a", seedA], [1, "o", seedO]].forEach(([k, kind, seed]) => { const x = lerp(ST.prjX + 84 + 14 * k, ST.encX + tokX(2 * t + k), ease(f3)), yT = lerp(ST.y + shortTop, ST.y + tokTop, ease(f3));
+      vcol(g, x, yT, SHORT.n, lerp(SHORT.cw, tokW, ease(f3)), lerp(SHORT.ch, tokCell, ease(f3)), hue, seed, 1, kind, SHORT.n, lerp(SHORT.gap, 0.4, ease(f3))); });
   }
   // ---- latent panel contents
   const L = g.append("g");

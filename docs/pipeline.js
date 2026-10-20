@@ -88,8 +88,10 @@ function buildScene(b) {
   const routes = trains.map((r, i) => { const off = ((i % 4) - 1.5) * 2.2;
     return { rid: r.rid, pass: pass.get(r.rid), pts: d3.range(Math.min(STEPS, r.n_steps)).map(t => { const s = stPos.get(`${t}:${r.steps[t].c}`); return [s.x, s.y + off]; }) }; });
   const finals = new Map(rolls.map(r => [r.rid, proj(zF(r.rid))]));
-  const fx = [...finals.values()].map(p => p[0]), fy = [...finals.values()].map(p => p[1]);
-  const padx = (d3.max(fx) - d3.min(fx)) * 0.1, pady = (d3.max(fy) - d3.min(fy)) * 0.1;
+  const trailOf = (r) => E.z[idx.get(r.rid)].map(proj);
+  const shown = [...finals.values()].concat(trailOf(trains[0]), trailOf(best.r));
+  const fx = shown.map(p => p[0]), fy = shown.map(p => p[1]);
+  const padx = (d3.max(fx) - d3.min(fx)) * 0.08, pady = (d3.max(fy) - d3.min(fy)) * 0.08;
   // latent panel: below the architecture strip
   const lx = d3.scaleLinear().domain([d3.min(fx) - padx, d3.max(fx) + padx]).range([540, 870]), ly = d3.scaleLinear().domain([d3.min(fy) - pady, d3.max(fy) + pady]).range([425, 245]);
   const L = (p) => [lx(p[0]), ly(p[1])];
@@ -149,9 +151,9 @@ const YC = ST.y + ST.h / 2;
 const hueOf = (i) => d3.hsl((360 * i / LANES + 200) % 360, 0.6, 0.5).formatHex();
 const hash = (a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1;
 // an embedding vector as a row of cells in the rollout's hue (lightness varies per cell)
-function vec(g, x, y, n, cw, ch, hue, seed, op = 1, kind = null) {
+function vec(g, x, y, n, cw, ch, hue, seed, op = 1, kind = null, shown = n) {
   const el = g.append("g").attr("opacity", op), base = d3.hsl(hue);
-  d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x + k * (cw + 1)).attr("y", y - ch / 2).attr("width", cw).attr("height", ch).attr("rx", 1).attr("fill", c.formatHex()); });
+  d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x + k * (cw + 1)).attr("y", y - ch / 2).attr("width", cw).attr("height", ch).attr("rx", 1).attr("fill", k < shown ? c.formatHex() : "#eceae5"); });
   if (kind) el.append("rect").attr("x", x - 1).attr("y", y - ch / 2 - 1).attr("width", n * (cw + 1) + 1).attr("height", ch + 2).attr("rx", 2).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 1);
   return el;
 }
@@ -183,6 +185,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   }
   const g = gRoot.append("g").attr("transform", `translate(${cam.tx},${cam.ty}) scale(${cam.k})`).attr("opacity", fadeIn);
   const detail = (name) => shot === name ? ease(sub(sq, 0.18, 0.4)) : 0;          // detail layers fade in once the camera arrives
+  const anim = ["emb", "prj", "enc", "pool"].includes(shot) ? sub(sq, 0.3, 0.96) : null;   // the step being processed inside a zoom-in
   const focus = S.focus, Q = S.query.r, hueIdx = new Map(S.trains.map((r, i) => [r.rid, i]));
   // ---- the rollout flowing (beat 4 flow shot, beat 6) and its progress
   let rid = null, steps = 0, prog = 0, mode = bi === 4 ? "many" : bi === 5 ? "query" : "one";
@@ -191,7 +194,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   else if (mode === "query") { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.06, 0.92) * steps; }
   const hue = mode === "query" ? "#8a8a86" : hueOf(hueIdx.get(rid) ?? 0);
   const t = Math.min(Math.max(steps - 1, 0), Math.floor(prog)), f = prog >= steps ? 1 : prog - Math.floor(prog);
-  const seen = steps ? Math.min(t + (f >= 0.8 || prog >= steps ? 1 : 0), steps) : 0;
+  const seen = steps ? Math.min(t + (f >= 0.35 || prog >= steps ? 1 : 0), steps) : 0;
   // ---- architecture (always drawn)
   g.append("text").attr("x", ST.qX).attr("y", ST.y - 16).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text("Precog-RM");
   const encPulse = mode !== "many" && prog > 0 && prog < steps ? Math.sin(Math.PI * f) : 0;
@@ -216,15 +219,34 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   // embed stage: tuple -> two long vectors
   const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`);
   const showEmb = shot === "flow" || shot === "over" || mode !== "one" ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
-  pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, showEmb);
-  vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3, showEmb, "a"); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showEmb, "o");
+  if (shot === "emb" && anim != null) {                                           // zoom-in: the tuple arrives, then its two vectors fill in cell by cell
+    const arrive = ease(sub(anim, 0, 0.22)), fillA = sub(anim, 0.3, 0.62), fillO = sub(anim, 0.5, 0.82);
+    if (arrive < 1) pair(g, lerp(slot(0), ST.embX + 18, arrive), YC + 2 + lerp(0, 0, arrive), fs ? fs.ai : "message-square", fs ? fs.oi : "user", 4 + arrive, 1);
+    else pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, 1);
+    vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7, 1, "a", Math.round(24 * fillA)); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + 1, 1, "o", Math.round(24 * fillO));
+    if (fillA > 0 && fillA < 1) inEmb.append("rect").attr("x", 34 + Math.round(24 * fillA) * 4.2).attr("y", 50).attr("width", 2).attr("height", 12).attr("fill", ACT);
+    if (fillO > 0 && fillO < 1) inEmb.append("rect").attr("x", 34 + Math.round(24 * fillO) * 4.2).attr("y", 70).attr("width", 2).attr("height", 12).attr("fill", OBS);
+  } else {
+    pair(inEmb, 18, 66, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 5, showEmb);
+    vec(inEmb, 34, 56, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3, showEmb, "a"); vec(inEmb, 34, 76, 24, 3.2, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showEmb, "o");
+  }
   inEmb.append("text").attr("x", 140).attr("y", 60).attr("text-anchor", "end").attr("font-size", 7).attr("fill", ACT).text("a");
   inEmb.append("text").attr("x", 140).attr("y", 80).attr("text-anchor", "end").attr("font-size", 7).attr("fill", OBS).text("o");
   // project stage: long -> short
   const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`), showPrj = shot === "flow" || mode !== "one" ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
-  vec(inPrj, 12, 56, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3, showPrj * 0.6, "a"); vec(inPrj, 12, 76, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj * 0.6, "o");
   inPrj.append("text").attr("x", 55).attr("y", 97).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("W · x + b");
-  vec(inPrj, 78, 56, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3, showPrj, "a"); vec(inPrj, 78, 76, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj, "o");
+  if (shot === "prj" && anim != null) {                                            // zoom-in: the long vectors squeeze into the short ones
+    const sq_ = ease(sub(anim, 0.1, 0.6)), out = sub(anim, 0.45, 0.9);
+    [[56, "a", 0], [76, "o", 1]].forEach(([y, kind, off]) => {
+      const cw = lerp(1.6, 0.5, sq_), x0 = lerp(12, 48, sq_);
+      vec(inPrj, x0, y, 24, cw, 7, hue, (rid ?? 0) * 7 + off, 1 - 0.5 * sq_, kind);
+      vec(inPrj, 78, y, 8, 2.6, 8, hue, (rid ?? 0) * 7 + off, 1, kind, Math.round(8 * out)); });
+    inPrj.append("rect").attr("x", 40).attr("y", 46).attr("width", 34).attr("height", 40).attr("rx", 4).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1).attr("opacity", Math.sin(Math.PI * sq_));
+    inPrj.append("text").attr("x", 57).attr("y", 44).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", ACT).attr("opacity", Math.sin(Math.PI * sq_)).text("W");
+  } else {
+    vec(inPrj, 12, 56, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3, showPrj * 0.6, "a"); vec(inPrj, 12, 76, 24, 1.6, 7, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj * 0.6, "o");
+    vec(inPrj, 78, 56, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3, showPrj, "a"); vec(inPrj, 78, 76, 8, 2.6, 8, hue, (rid ?? 0) * 7 + t * 3 + 1, showPrj, "o");
+  }
   // encode stage: the token row so far (a1 o1 a2 o2 ...) with two layer bands
   const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`);
   const nTok = mode === "many" ? 0 : Math.min(2 * seen, 24), tokW = 7, tokGap = 1.5, tokX = (j) => 10 + j * (tokW + tokGap);
@@ -233,17 +255,30 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   for (let j = 0; j < nTok; j++) { const k = Math.floor(j / 2), isA = j % 2 === 0; const tok = inEnc.append("g").attr("transform", `translate(${tokX(j)},88)`);
     tok.append("rect").attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.55, 0.35 + 0.4 * hash(rid, k, isA ? 1 : 2)).formatHex()).attr("stroke", isA ? ACT : OBS).attr("stroke-width", 0.8); }
   if (nTok > 0) inEnc.append("text").attr("x", tokX(nTok) + 4).attr("y", 99).attr("font-size", 7.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""}`);
-  if (nTok === 0 && (shot === "enc" || shot === "over" || shot === "pool")) {           // ghost tokens so the zoom-ins have something to attend over
-    for (let j = 0; j < 8; j++) inEnc.append("rect").attr("x", tokX(j)).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.45).attr("stroke", j % 2 === 0 ? ACT : OBS).attr("stroke-width", 0.6);
-    ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].forEach((lab, j) => inEnc.append("text").attr("x", tokX(j) + tokW / 2).attr("y", 110).attr("text-anchor", "middle").attr("font-size", 6).attr("fill", MUTED).attr("opacity", 0.8).text(lab)); }
+  let ghosts = 0;
+  if (nTok === 0 && (shot === "enc" || shot === "over" || shot === "pool")) {           // ghost tokens: in the encoder zoom-in they arrive pair by pair
+    const arr = shot === "enc" && anim != null ? sub(anim, 0, 0.6) * 8 : 8; ghosts = Math.min(8, Math.ceil(arr));
+    for (let j = 0; j < ghosts; j++) { const slide = shot === "enc" && anim != null ? clamp01(arr - j) : 1;
+      inEnc.append("rect").attr("x", lerp(tokX(j) - 40, tokX(j), ease(slide))).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.45 + 0.4 * slide).attr("stroke", j % 2 === 0 ? ACT : OBS).attr("stroke-width", 0.6); }
+    ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].slice(0, ghosts).forEach((lab, j) => inEnc.append("text").attr("x", tokX(j) + tokW / 2).attr("y", 110).attr("text-anchor", "middle").attr("font-size", 6).attr("fill", MUTED).attr("opacity", 0.8).text(lab));
+    if (shot === "enc" && anim != null) { const lp = sub(anim, 0.6, 1); [62, 44].forEach((y, li) => { const on = Math.sin(Math.PI * clamp01(lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", 8).attr("y", y).attr("width", ST.encW - 16).attr("height", 14).attr("rx", 4).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); }); } }
   // attention arcs (encoder zoom and while a step is being read)
-  const arcOp = detail("enc") > 0 ? detail("enc") : (encPulse > 0 && f > 0.55 ? encPulse : 0);
-  if (arcOp > 0) { const n = Math.max(nTok, 6); for (let j = 1; j < Math.min(n, 12); j++) { const from = tokX(j) + tokW / 2, to = tokX(Math.max(0, j - 1 - Math.floor(hash(j, 1, 2) * j))) + tokW / 2;
+  const arcOp = detail("enc") > 0 ? detail("enc") * (anim != null ? sub(anim, 0.15, 0.4) : 1) : (encPulse > 0 && f > 0.55 ? encPulse : 0);
+  if (arcOp > 0) { const n = nTok > 0 ? nTok : ghosts; for (let j = 1; j < Math.min(n, 12); j++) { const from = tokX(j) + tokW / 2, to = tokX(Math.max(0, j - 1 - Math.floor(hash(j, 1, 2) * j))) + tokW / 2;
       inEnc.append("path").attr("d", `M${from},86 Q${(from + to) / 2},${86 - 10 - Math.abs(from - to) * 0.25} ${to},86`).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 0.8).attr("opacity", 0.5 * arcOp); } }
   // pool stage: tokens collapse into one vector
   const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`);
-  vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, nTok > 0 || shot === "pool" || shot === "over" ? 1 : 0.35);
   inPool.append("text").attr("x", ST.poolW / 2).attr("y", 92).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("mean over tokens");
+  if (shot === "pool" && anim != null) {                                           // zoom-in: the tokens slide in and average into one vector; z drops into the panel
+    const merge = ease(sub(anim, 0, 0.45)), drop = ease(sub(anim, 0.55, 1));
+    for (let j = 0; j < 8; j++) { const x0 = ST.encX + tokX(j), x1 = ST.poolX + 10 + j * 6.2, y0 = ST.y + 95, y1 = ST.y + 70;
+      g.append("rect").attr("x", lerp(x0, x1, merge)).attr("y", lerp(y0, y1, merge) - 5).attr("width", lerp(tokW, 5.2, merge)).attr("height", lerp(14, 10, merge)).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(hue).h, 0.4, 0.5 + 0.3 * hash(1, j, 3)).formatHex()).attr("opacity", 0.85 * (1 - merge)); }
+    vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, merge);
+    if (drop > 0) { const tr = S.trails.get(focus.rid), dst = tr[0];
+      const px = lerp(ST.zX, dst[0], drop), py = lerp(YC + 12, dst[1], drop);
+      g.append("circle").attr("cx", px).attr("cy", py).attr("r", 7).attr("fill", hue).attr("stroke", "#fff").attr("stroke-width", 1.5); }
+    g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10 + 4 * Math.sin(Math.PI * sub(anim, 0.45, 0.6))).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("opacity", Math.sin(Math.PI * sub(anim, 0.45, 0.6)));
+  } else vec(inPool, 10, 70, 8, 5.2, 10, hue, (rid ?? 0) * 7 + 99, nTok > 0 || shot === "over" ? 1 : 0.35);
   // ---- zoom-in detail layers
   const dEmb = detail("emb");
   if (dEmb > 0) { const d = g.append("g").attr("opacity", dEmb);
@@ -274,7 +309,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   const L = g.append("g");
   if (mode === "one") {
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.8, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.35, 0.97)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
       L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
       const labelled = shot === "flow" ? sub(sq, 0.92, 0.98) : 0, pass = S.pass.get(rid);
       L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
@@ -298,7 +333,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   } else {
     drawPrototypes(L, S, 1, true);
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.8, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.35, 0.97)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
       L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
       [[S.protoP, PASS], [S.protoF, FAIL]].forEach(([pt, col]) => L.append("line").attr("x1", cur[0]).attr("y1", cur[1]).attr("x2", pt[0]).attr("y2", pt[1]).attr("stroke", col).attr("stroke-width", 1.2).attr("stroke-dasharray", "3,3"));
       L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 10).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2.5); icon(L, "bot", cur[0], cur[1], 12, INK);

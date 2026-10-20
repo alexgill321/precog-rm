@@ -157,11 +157,15 @@ function vec(g, x, y, n, cw, ch, hue, seed, op = 1, kind = null, shown = n) {
   if (kind) el.append("rect").attr("x", x - 1).attr("y", y - ch / 2 - 1).attr("width", n * (cw + 1) + 1).attr("height", ch + 2).attr("rx", 2).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 1);
   return el;
 }
-// a vector drawn as a vertical column of cells (top at yTop), in the rollout's hue
-function vcol(g, x, yTop, n, cw, ch, hue, seed, op = 1, kind = null, shown = n, gap = 0.6) {
-  const el = g.append("g").attr("opacity", op), base = d3.hsl(hue);
-  d3.range(n).forEach(k => { const c = d3.hsl(base.h, base.s, 0.3 + 0.5 * hash(seed, k, 1)); el.append("rect").attr("x", x - cw / 2).attr("y", yTop + k * (ch + gap)).attr("width", cw).attr("height", ch).attr("fill", k < shown ? c.formatHex() : "#eceae5"); });
-  if (kind) el.append("rect").attr("x", x - cw / 2 - 1).attr("y", yTop - 1).attr("width", cw + 2).attr("height", n * (ch + gap) + 1).attr("rx", 1.5).attr("fill", "none").attr("stroke", kind === "a" ? ACT : OBS).attr("stroke-width", 0.8);
+// a vector drawn as a vertical column of cells. scheme: "a" (blues), "o" (oranges) or "ao" (top half blue, bottom half orange)
+const SCHEME = { a: 215, o: 30 };
+function vcol(g, x, yTop, n, cw, ch, scheme, seed, op = 1, outline = true, shown = n, gap = 0.6) {
+  const el = g.append("g").attr("opacity", op);
+  d3.range(n).forEach(k => { const part = scheme === "ao" ? (k < n / 2 ? "a" : "o") : scheme; const c = d3.hsl(SCHEME[part], 0.65, 0.32 + 0.45 * hash(seed, k, part === "a" ? 1 : 2));
+    el.append("rect").attr("x", x - cw / 2).attr("y", yTop + k * (ch + gap)).attr("width", cw).attr("height", ch).attr("fill", k < shown ? c.formatHex() : "#eceae5"); });
+  if (outline) { if (scheme === "ao") { el.append("rect").attr("x", x - cw / 2 - 1).attr("y", yTop - 1).attr("width", cw + 2).attr("height", (n / 2) * (ch + gap) + 0.5).attr("rx", 1.5).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 0.8);
+      el.append("rect").attr("x", x - cw / 2 - 1).attr("y", yTop + (n / 2) * (ch + gap) - 0.5).attr("width", cw + 2).attr("height", (n / 2) * (ch + gap) + 1).attr("rx", 1.5).attr("fill", "none").attr("stroke", OBS).attr("stroke-width", 0.8); }
+    else el.append("rect").attr("x", x - cw / 2 - 1).attr("y", yTop - 1).attr("width", cw + 2).attr("height", n * (ch + gap) + 1).attr("rx", 1.5).attr("fill", "none").attr("stroke", scheme === "a" ? ACT : OBS).attr("stroke-width", 0.8); }
   return el;
 }
 function stage(g, x, w, label, sub, op, pulse = 0) {
@@ -222,82 +226,82 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   if (mode !== "many" && rid != null) for (let k = 0; k < Math.min(steps, 11); k++) if (k > t || (k === t && f > 0.25) || prog === 0) pair(g, slot(k), YC, ic[k], oc[k], 4, k > t || prog === 0 ? 0.95 : 0.25);
   // ---- inside the stages: vectors as they are actually processed
   const F = S.focusSteps, fs = F[Math.min(t, F.length - 1)];
-  const seedA = (rid ?? 0) * 7 + t * 3, seedO = seedA + 1, hueOfTok = (k, isA) => d3.hsl(d3.hsl(hue).h, 0.55, 0.35 + 0.4 * hash(rid ?? 0, k, isA ? 1 : 2)).formatHex();
-  const TALL = { n: 30, cw: 9, ch: 2.6, gap: 0.6 }, SHORT = { n: 8, cw: 9, ch: 4.6, gap: 1 };
-  const tallH = TALL.n * (TALL.ch + TALL.gap), shortH = SHORT.n * (SHORT.ch + SHORT.gap);
+  const seed = (rid ?? 0) * 7 + t * 3;
+  const HALF = 16, TALL = { n: HALF, cw: 9, ch: 2.6, gap: 0.6 }, CAT = { n: 2 * HALF, cw: 9, ch: 2.6, gap: 0.6 }, SHORT = { n: 8, cw: 9, ch: 4.6, gap: 1 };
+  const halfH = HALF * (TALL.ch + TALL.gap), catH = 2 * halfH, shortH = SHORT.n * (SHORT.ch + SHORT.gap);
   const ex = (t_, n) => { t_ = clean(t_); return t_.length > n ? t_.slice(0, n - 1) + "…" : t_; };
-  // -- embed: texts in, two tall columns out (a and o are separate tokens)
+  // -- embed: texts in; a (blue) and o (orange) vectors out, then stacked into one concatenated vector
   const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`);
-  const embA = ST.embW - 50, embO = ST.embW - 24, colTop = 46;
-  const embAct = shot === "emb" && anim != null ? { arrive: ease(sub(anim, 0, 0.2)), fa: sub(anim, 0.25, 0.6), fo: sub(anim, 0.45, 0.8) } : null;
+  const embAct = shot === "emb" && anim != null ? { arrive: ease(sub(anim, 0, 0.18)), fa: sub(anim, 0.2, 0.45), fo: sub(anim, 0.35, 0.6), stack: ease(sub(anim, 0.68, 0.92)) } : null;
   const embOp = embAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
   inEmb.append("text").attr("x", 10).attr("y", 50).attr("font-size", 6).attr("fill", ACT).attr("opacity", embOp).text(ex(fs ? fs.at : "", 22));
   inEmb.append("text").attr("x", 10).attr("y", 60).attr("font-size", 6).attr("fill", OBS).attr("opacity", embOp).text(ex(fs ? fs.ot : "", 22));
   inEmb.append("text").attr("x", 10).attr("y", 74).attr("font-size", 6).attr("fill", MUTED).attr("opacity", embOp).text("text → vector");
-  arrowTo(inEmb, 60, embA - 12, 98, embOp * 0.8);
-  inEmb.append("text").attr("x", embA).attr("y", colTop - 6).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", ACT).text("a");
-  inEmb.append("text").attr("x", embO).attr("y", colTop - 6).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", OBS).text("o");
-  vcol(inEmb, embA, colTop, TALL.n, TALL.cw, TALL.ch, hue, seedA, embOp, "a", embAct ? Math.round(TALL.n * embAct.fa) : TALL.n, TALL.gap);
-  vcol(inEmb, embO, colTop, TALL.n, TALL.cw, TALL.ch, hue, seedO, embOp, "o", embAct ? Math.round(TALL.n * embAct.fo) : TALL.n, TALL.gap);
-  inEmb.append("text").attr("x", (embA + embO) / 2).attr("y", colTop + tallH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("3072-d each");
+  arrowTo(inEmb, 60, 86, 98, embOp * 0.8);
+  const catTop = 36, aTop = catTop, oTopSide = catTop, oTopStack = catTop + halfH, xA = 104, xO = 126, xCat = 115;
+  const stack = embAct ? embAct.stack : 1;                                       // 1 = already concatenated (overview and flow)
+  const xa = lerp(xA, xCat, stack), xo = lerp(xO, xCat, stack), oTop = lerp(oTopSide, oTopStack, stack);
+  vcol(inEmb, xa, aTop, HALF, TALL.cw, TALL.ch, "a", seed, embOp, true, embAct ? Math.round(HALF * embAct.fa) : HALF, TALL.gap);
+  vcol(inEmb, xo, oTop, HALF, TALL.cw, TALL.ch, "o", seed + 1, embOp, true, embAct ? Math.round(HALF * embAct.fo) : HALF, TALL.gap);
+  inEmb.append("text").attr("x", xa).attr("y", aTop - 5).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", ACT).attr("opacity", 1 - stack).text("a");
+  inEmb.append("text").attr("x", xo).attr("y", oTopSide - 5).attr("text-anchor", "middle").attr("font-size", 7).attr("fill", OBS).attr("opacity", 1 - stack).text("o");
+  inEmb.append("text").attr("x", xCat).attr("y", catTop + catH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(stack > 0.5 ? "[a ; o] · 2 × 3072-d" : "3072-d each");
   if (embAct && embAct.arrive < 1) pair(g, lerp(slot(0), ST.embX + 24, embAct.arrive), YC, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 4 + embAct.arrive, 1);
-  // -- project: tall columns squeezed through W into short ones
+  // -- project: the concatenated vector squeezed through W into a short one
   const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`);
   const prjAct = shot === "prj" && anim != null ? { sq: ease(sub(anim, 0.1, 0.6)), out: sub(anim, 0.45, 0.9) } : null;
   const prjOp = prjAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
-  const sqz = prjAct ? prjAct.sq : 0, tallTop = 46, shortTop = 46 + (tallH - shortH) / 2;
-  [[14, "a", seedA], [28, "o", seedO]].forEach(([x, kind, seed]) => { const hcell = lerp(TALL.ch, 1.2, sqz), hgap = lerp(TALL.gap, 0.3, sqz);
-    vcol(inPrj, lerp(x, 40, sqz), lerp(tallTop, shortTop + 8, sqz), TALL.n, lerp(6, 4, sqz), hcell, hue, seed, prjOp * (1 - 0.5 * sqz), kind, TALL.n, hgap); });
-  inPrj.append("rect").attr("x", 44).attr("y", shortTop - 6).attr("width", 22).attr("height", shortH + 12).attr("rx", 3).attr("fill", "#fff").attr("stroke", prjAct ? ACT : "#c9c9c3").attr("stroke-width", prjAct ? 1 + Math.sin(Math.PI * sqz) : 1);
-  inPrj.append("text").attr("x", 55).attr("y", shortTop + shortH / 2 + 3).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", INK).text("W");
-  arrowTo(inPrj, 68, 76, shortTop + shortH / 2, prjOp);
-  [[84, "a", seedA], [98, "o", seedO]].forEach(([x, kind, seed]) => vcol(inPrj, x, shortTop, SHORT.n, SHORT.cw, SHORT.ch, hue, seed, prjOp, kind, prjAct ? Math.round(SHORT.n * prjAct.out) : SHORT.n, SHORT.gap));
-  inPrj.append("text").attr("x", 91).attr("y", shortTop + shortH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("128-d");
-  inPrj.append("text").attr("x", 21).attr("y", tallTop + tallH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).attr("opacity", 1 - sqz).text("3072-d");
-  // -- encode: a row of token columns under two horizontal layers of nodes, fully connected
+  const sqz = prjAct ? prjAct.sq : 0, tallTop = 36, shortTop = 36 + (catH - shortH) / 2;
+  vcol(inPrj, lerp(18, 44, sqz), lerp(tallTop, shortTop + 6, sqz), CAT.n, lerp(7, 4, sqz), lerp(CAT.ch, 1.1, sqz), "ao", seed, prjOp * (1 - 0.5 * sqz), true, CAT.n, lerp(CAT.gap, 0.3, sqz));
+  inPrj.append("rect").attr("x", 44).attr("y", shortTop - 6).attr("width", 24).attr("height", shortH + 12).attr("rx", 3).attr("fill", "#fff").attr("stroke", prjAct ? ACT : "#c9c9c3").attr("stroke-width", prjAct ? 1 + Math.sin(Math.PI * sqz) : 1);
+  inPrj.append("text").attr("x", 56).attr("y", shortTop + shortH / 2 + 3).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", INK).text("W");
+  arrowTo(inPrj, 70, 80, shortTop + shortH / 2, prjOp);
+  vcol(inPrj, 92, shortTop, SHORT.n, SHORT.cw, SHORT.ch, "ao", seed, prjOp, true, prjAct ? Math.round(SHORT.n * prjAct.out) : SHORT.n, SHORT.gap);
+  inPrj.append("text").attr("x", 92).attr("y", shortTop + shortH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("128-d");
+  inPrj.append("text").attr("x", 18).attr("y", tallTop + catH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).attr("opacity", 1 - sqz).text("6144-d");
+  // -- encode: one token column per step spread across the block, under two full-width layers of nodes
   const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`);
-  const encAct = shot === "enc" && anim != null ? { arr: sub(anim, 0, 0.55) * 8, lines: sub(anim, 0.3, 0.7), lp: sub(anim, 0.6, 1) } : null;
-  const nTokReal = mode === "many" ? 0 : Math.min(2 * seen, 24);
-  const ghosts = nTokReal === 0 && (shot === "enc" || shot === "over" || shot === "pool") ? (encAct ? Math.min(8, Math.ceil(encAct.arr)) : 8) : 0;
-  const nTok = nTokReal || ghosts, tokW = 6, tokX = (j) => 12 + j * 8.2, tokTop = ST.h - 40, tokCell = 3, L1Y = 92, L2Y = 60;
-  const nodeX = (j) => tokX(j), nodes = Math.max(nTok, 1);
-  // connections: every token to every layer-1 node, every layer-1 node to every layer-2 node
-  const linesOp = encAct ? 0.07 * encAct.lines : (shot === "over" || shot === "pool" || nTokReal > 0 ? 0.07 : 0);
+  const encAct = shot === "enc" && anim != null ? { arr: sub(anim, 0, 0.55) * 6, lines: sub(anim, 0.3, 0.7), lp: sub(anim, 0.6, 1) } : null;
+  const nTokReal = mode === "many" ? 0 : Math.min(seen, 12);
+  const ghosts = nTokReal === 0 && (shot === "enc" || shot === "over" || shot === "pool") ? (encAct ? Math.min(6, Math.ceil(encAct.arr)) : 6) : 0;
+  const nTok = nTokReal || ghosts, tokW = 7, tokCell = 2.6, tokTop = ST.h - 36, L1Y = 92, L2Y = 58;
+  const spanL = 16, spanR = ST.encW - 44, tokX = (j) => nTok <= 1 ? (spanL + spanR) / 2 : spanL + j * (spanR - spanL) / (nTok - 1), nodeX = tokX;
+  [[L1Y, "layer 1"], [L2Y, "layer 2"]].forEach(([y, lab]) => { inEnc.append("rect").attr("x", 8).attr("y", y - 8).attr("width", ST.encW - 16).attr("height", 16).attr("rx", 8).attr("fill", "#f1f1ee");
+    inEnc.append("text").attr("x", ST.encW - 10).attr("y", y + 3).attr("text-anchor", "end").attr("font-size", 6.5).attr("fill", MUTED).text(lab); });
+  const linesOp = encAct ? 0.12 * encAct.lines : (shot === "over" || shot === "pool" || nTokReal > 0 ? 0.12 : 0);
   if (linesOp > 0 && nTok > 0) for (let j = 0; j < nTok; j++) for (let k = 0; k < nTok; k++) {
-    inEnc.append("line").attr("x1", tokX(j)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 3).attr("stroke", INK).attr("stroke-opacity", linesOp);
-    inEnc.append("line").attr("x1", nodeX(j)).attr("y1", L1Y - 3).attr("x2", nodeX(k)).attr("y2", L2Y + 3).attr("stroke", INK).attr("stroke-opacity", linesOp); }
-  // the current token's connections light up while it is read
-  const hot = encPulse > 0 && f > 0.55 ? encPulse : (encAct ? Math.sin(Math.PI * clamp01(encAct.arr - Math.floor(encAct.arr))) * (encAct.arr < 8 ? 1 : 0) : 0);
+    inEnc.append("line").attr("x1", tokX(j)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 4).attr("stroke", INK).attr("stroke-opacity", linesOp);
+    inEnc.append("line").attr("x1", nodeX(j)).attr("y1", L1Y - 4).attr("x2", nodeX(k)).attr("y2", L2Y + 4).attr("stroke", INK).attr("stroke-opacity", linesOp); }
+  const hot = encPulse > 0 && f > 0.55 ? encPulse : (encAct ? Math.sin(Math.PI * clamp01(encAct.arr - Math.floor(encAct.arr))) * (encAct.arr < 6 ? 1 : 0) : 0);
   const hotJ = encAct ? Math.min(nTok - 1, Math.floor(encAct.arr)) : nTok - 1;
-  if (hot > 0 && hotJ >= 0) for (let k = 0; k < nTok; k++) inEnc.append("line").attr("x1", tokX(hotJ)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 3).attr("stroke", hue).attr("stroke-width", 1).attr("stroke-opacity", 0.6 * hot);
+  if (hot > 0 && hotJ >= 0) for (let k = 0; k < nTok; k++) { inEnc.append("line").attr("x1", tokX(hotJ)).attr("y1", tokTop).attr("x2", nodeX(k)).attr("y2", L1Y + 4).attr("stroke", ACT).attr("stroke-width", 1).attr("stroke-opacity", 0.7 * hot);
+    inEnc.append("line").attr("x1", nodeX(k)).attr("y1", L1Y - 4).attr("x2", nodeX(k)).attr("y2", L2Y + 4).attr("stroke", ACT).attr("stroke-width", 0.8).attr("stroke-opacity", 0.4 * hot); }
   for (let j = 0; j < nTok; j++) {
-    const isA = j % 2 === 0, slide = encAct ? clamp01(encAct.arr - j) : 1, tokHue = hueOfTok(Math.floor(j / 2), isA);
-    const x = lerp(tokX(j) - 30, tokX(j), ease(slide));
-    vcol(inEnc, x, tokTop, SHORT.n, tokW, tokCell, tokHue, (rid ?? 0) * 7 + j, (ghosts ? 0.5 : 1) * (0.3 + 0.7 * slide), isA ? "a" : "o", SHORT.n, 0.4);
-    inEnc.append("circle").attr("cx", nodeX(j)).attr("cy", L1Y).attr("r", 3).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 0.8).attr("opacity", 0.4 + 0.6 * slide);
-    inEnc.append("circle").attr("cx", nodeX(j)).attr("cy", L2Y).attr("r", 3).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 0.8).attr("opacity", 0.4 + 0.6 * slide);
+    const slide = encAct ? clamp01(encAct.arr - j) : 1, x = lerp(tokX(j) - 30, tokX(j), ease(slide));
+    vcol(inEnc, x, tokTop, SHORT.n, tokW, tokCell, "ao", (rid ?? 0) * 7 + j * 3, (ghosts ? 0.6 : 1) * (0.3 + 0.7 * slide), true, SHORT.n, 0.4);
+    [L1Y, L2Y].forEach(y => inEnc.append("circle").attr("cx", nodeX(j)).attr("cy", y).attr("r", 4).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 0.9).attr("opacity", 0.4 + 0.6 * slide));
   }
-  if (ghosts) ["a₁", "o₁", "a₂", "o₂", "a₃", "o₃", "a₄", "o₄"].slice(0, ghosts).forEach((lab, j) => inEnc.append("text").attr("x", tokX(j)).attr("y", ST.h - 6).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", MUTED).text(lab));
-  if (nTokReal) inEnc.append("text").attr("x", tokX(nTok - 1) + 10).attr("y", tokTop + 20).attr("font-size", 6.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""}`);
-  inEnc.append("text").attr("x", ST.encW - 8).attr("y", L1Y + 3).attr("text-anchor", "end").attr("font-size", 6.5).attr("fill", MUTED).text("layer 1");
-  inEnc.append("text").attr("x", ST.encW - 8).attr("y", L2Y + 3).attr("text-anchor", "end").attr("font-size", 6.5).attr("fill", MUTED).text("layer 2");
-  if (encAct) [L1Y, L2Y].forEach((y, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", 6).attr("y", y - 7).attr("width", ST.encW - 12).attr("height", 14).attr("rx", 7).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1).attr("opacity", on); });
+  inEnc.append("text").attr("x", spanL - 6).attr("y", tokTop + 14).attr("text-anchor", "end").attr("font-size", 6).attr("fill", MUTED).text(ghosts ? "steps" : "");
+  if (ghosts) d3.range(ghosts).forEach(j => inEnc.append("text").attr("x", tokX(j)).attr("y", ST.h - 6).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", MUTED).text(`t${j + 1}`));
+  if (nTokReal) inEnc.append("text").attr("x", (spanL + spanR) / 2).attr("y", ST.h - 6).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(`${seen} step${seen > 1 ? "s" : ""} so far`);
+  if (encAct) [L1Y, L2Y].forEach((y, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", 8).attr("y", y - 8).attr("width", ST.encW - 16).attr("height", 16).attr("rx", 8).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); });
   // -- pool: the layer-2 outputs average into one 128-d column, z
   const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`);
   const poolAct = shot === "pool" && anim != null ? { merge: ease(sub(anim, 0, 0.45)), drop: ease(sub(anim, 0.55, 1)) } : null;
-  const zTop = 46 + (tallH - shortH) / 2;
-  if (poolAct) { for (let j = 0; j < 8; j++) { const x0 = ST.encX + nodeX(j), x1 = ST.poolX + ST.poolW / 2, y0 = ST.y + L2Y, y1 = ST.y + zTop + shortH / 2;
-      g.append("circle").attr("cx", lerp(x0, x1, poolAct.merge)).attr("cy", lerp(y0, y1, poolAct.merge)).attr("r", 3).attr("fill", hue).attr("opacity", 0.8 * (1 - poolAct.merge)); } }
-  vcol(inPool, ST.poolW / 2, zTop, SHORT.n, SHORT.cw, SHORT.ch, hue, (rid ?? 0) * 7 + 99, poolAct ? poolAct.merge : (nTokReal > 0 || shot === "over" ? 1 : 0.35), null, SHORT.n, SHORT.gap);
-  inPool.append("text").attr("x", ST.poolW / 2).attr("y", zTop + shortH + 9).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("mean · 128-d");
+  const zTop = 36 + (catH - shortH) / 2;
+  if (poolAct) for (let j = 0; j < nTok; j++) { const x0 = ST.encX + nodeX(j), x1 = ST.poolX + ST.poolW / 2, y0 = ST.y + L2Y, y1 = ST.y + zTop + shortH / 2;
+    g.append("circle").attr("cx", lerp(x0, x1, poolAct.merge)).attr("cy", lerp(y0, y1, poolAct.merge)).attr("r", 3.5).attr("fill", "#fff").attr("stroke", INK).attr("opacity", 0.9 * (1 - poolAct.merge)); }
+  vcol(inPool, ST.poolW / 2, zTop, SHORT.n, SHORT.cw, SHORT.ch, "ao", (rid ?? 0) * 7 + 99, poolAct ? poolAct.merge : (nTokReal > 0 || shot === "over" ? 1 : 0.35), false, SHORT.n, SHORT.gap);
+  inPool.append("rect").attr("x", ST.poolW / 2 - SHORT.cw / 2 - 2).attr("y", zTop - 2).attr("width", SHORT.cw + 4).attr("height", shortH + 3).attr("rx", 2).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.2);
+  inPool.append("text").attr("x", ST.poolW / 2).attr("y", zTop + shortH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("mean · z");
   if (poolAct && poolAct.drop > 0) { const dst = S.trails.get(focus.rid)[0]; g.append("circle").attr("cx", lerp(ST.zX, dst[0], poolAct.drop)).attr("cy", lerp(YC + 12, dst[1], poolAct.drop)).attr("r", 7).attr("fill", hue).attr("stroke", "#fff").attr("stroke-width", 1.5); }
   if (poolAct) g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10 + 4 * Math.sin(Math.PI * sub(anim, 0.45, 0.6))).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("opacity", Math.sin(Math.PI * sub(anim, 0.45, 0.6)));
   // ---- the current tuple travelling between stages (flow shot, beat 6)
   if (mode !== "many" && prog > 0 && prog < steps) {
     const f1 = sub(f, 0, 0.25), f3 = sub(f, 0.55, 0.78);
     if (f1 < 1) pair(g, lerp(slot(t), ST.embX + 24, ease(f1)), YC, ic[t], oc[t], 4 + f1, 1);
-    if (f >= 0.55 && f3 < 1) [[0, "a", seedA], [1, "o", seedO]].forEach(([k, kind, seed]) => { const x = lerp(ST.prjX + 84 + 14 * k, ST.encX + tokX(2 * t + k), ease(f3)), yT = lerp(ST.y + shortTop, ST.y + tokTop, ease(f3));
-      vcol(g, x, yT, SHORT.n, lerp(SHORT.cw, tokW, ease(f3)), lerp(SHORT.ch, tokCell, ease(f3)), hue, seed, 1, kind, SHORT.n, lerp(SHORT.gap, 0.4, ease(f3))); });
+    if (f >= 0.55 && f3 < 1) { const e3 = ease(f3), x = lerp(ST.prjX + 92, ST.encX + tokX(Math.min(nTok - 1, t)), e3), yT = lerp(ST.y + shortTop, ST.y + tokTop, e3);
+      vcol(g, x, yT, SHORT.n, lerp(SHORT.cw, tokW, e3), lerp(SHORT.ch, tokCell, e3), "ao", seed, 1, true, SHORT.n, lerp(SHORT.gap, 0.4, e3)); }
   }
   // ---- latent panel contents
   const L = g.append("g");
@@ -320,8 +324,9 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
       else { const li = clamp01(label * 1.4 - i * 0.025); L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5).attr("fill", d3.interpolateRgb(h, pass ? PASS : FAIL)(li)).attr("stroke", "#fff").attr("stroke-width", 1.5); } });
     if (flowing) { const { r, fI, h } = flowing, icr = S.icons.get(r.rid), ocr = S.obs.get(r.rid);
       for (let k = 0; k < Math.min(11, r.n_steps); k++) pair(g, slot(k), YC, icr[k], ocr[k], 4, 0.9 * (1 - fI));
-      const x = lerp(ST.embX + 34, ST.encX + 12, ease(fI)); vec(g, x, ST.y + 56, 8, 2.6, 8, h, r.rid * 7, 1, "a"); vec(g, x, ST.y + 76, 8, 2.6, 8, h, r.rid * 7 + 1, 1, "o");
-      for (let j = 0; j < Math.min(24, 2 * r.n_steps); j++) inEnc.append("rect").attr("x", tokX(j)).attr("y", 88).attr("width", tokW).attr("height", 14).attr("rx", 2).attr("fill", d3.hsl(d3.hsl(h).h, 0.55, 0.35 + 0.4 * hash(r.rid, j, 1)).formatHex()).attr("opacity", fI); }
+      const x = lerp(ST.embX + 115, ST.encX + 20, ease(fI)); vcol(g, x, ST.y + 36 + (catH - shortH) / 2, SHORT.n, SHORT.cw, SHORT.ch, "ao", r.rid * 7, 1, true, SHORT.n, SHORT.gap);
+      const nT = Math.min(12, r.n_steps), tx_ = (j) => 16 + j * (ST.encW - 60) / Math.max(1, nT - 1);
+      for (let j = 0; j < nT; j++) vcol(inEnc, tx_(j), ST.h - 36, SHORT.n, 7, 2.6, "ao", r.rid * 7 + j * 3, fI, true, SHORT.n, 0.4); }
     g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${Math.min(others.length, Math.floor(sub(q, 0.02, 0.57) * others.length)) + 1} of ${S.trains.length} labeled rollouts`);
     if (proto > 0) drawPrototypes(L, S, proto, false);
   } else {

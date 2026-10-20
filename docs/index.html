@@ -4,29 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
-<meta name="description" content="Learning an Outcome-Predictive Representation of LLM Agent Trajectories (Precog-RM): project page with interactive behavior-state maps and latent-space scoring.">
-<link rel="stylesheet" href="style.css?v=3">
+<meta name="description" content="Learning an Outcome-Predictive Representation of LLM Agent Trajectories (Precog-RM): a walkthrough of the paper with interactive figures.">
+<link rel="stylesheet" href="style.css?v=5">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body>
 <header class="hero">
   <div class="wrap">
-    <p class="kicker">Precog-RM</p>
+    <p class="kicker">Precog-RM · arXiv 2610.19614</p>
     <h1>Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories</h1>
-    <p class="authors">Alexander Gill, Guram Gogia, Francisco Guzmán</p>
+    <p class="authors">Alexander Gill<sup>1,2</sup>, Guram Gogia<sup>1</sup>, Francisco Guzmán<sup>1</sup> &nbsp;·&nbsp; <span class="aff"><sup>1</sup>Handshake AI, <sup>2</sup>University of Utah</span></p>
     <p class="links">
-      <a class="btn" href="https://arxiv.org/abs/2610.19614">arXiv</a>
+      <a class="btn" href="https://arxiv.org/abs/2610.19614">Paper</a>
       <a class="btn" href="https://github.com/alexgill321/precog-rm">Code</a>
       <a class="btn" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data &amp; checkpoints</a>
     </p>
-    <p class="abstract">Agentic tool-use trajectories are paths through a shared embedding space of actions and environment observations. Successful and failed rollouts of the same task separate in this space. Precog-RM meta-learns a representation in which rollout success can be predicted few-shot across unseen tasks and policy models, and uses that signal as an early-stopping controller for GRPO post-training.</p>
+    <p class="abstract">An agentic rollout is a path through a shared embedding space of actions and environment observations. Successful and failed attempts at the same task separate in that space, and simple per-task discriminators recover the outcome at up to 0.95 AUROC. Precog-RM meta-learns a representation in which that signal carries to unseen tasks and policies from a single batch of labeled rollouts, predicts outcomes mid-rollout, and, deployed as an early-stopping controller for GRPO, cuts training FLOPs by up to 47.3% at near-baseline pass@1.</p>
+    <ol class="moves">
+      <li><a href="#c1">Rollouts are paths</a></li><li><a href="#c2">The outcome is in the path</a></li><li><a href="#c3">Learn the space</a></li>
+      <li><a href="#c4">Few shots, new tasks, new policies</a></li><li><a href="#c5">Tell before the end</a></li><li><a href="#c6">Inside GRPO</a></li><li><a href="#c7">Explore the release</a></li>
+    </ol>
   </div>
 </header>
 
-<main class="wrap">
+<div class="wrap layout">
+<nav class="toc" aria-label="Chapters">
+  <a href="#pipeline-section">How it works</a>
+  <a href="#c1">1 · Paths</a><a href="#c2">2 · Separable</a><a href="#c3">3 · Learned space</a><a href="#c4">4 · Few-shot</a>
+  <a href="#c5">5 · Early</a><a href="#c6">6 · GRPO</a><a href="#c7">7 · Explore</a><a href="#cite">Cite</a>
+</nav>
+<main>
   <section id="pipeline-section" class="card">
     <h2>How it works, in one map</h2>
-    <p class="lede">The same 50 rollouts of one task, retail/103 from Tau2-Bench, carried through the whole pipeline: behavior states as stations, rollouts as trains, the encoder folding each route into a point, prototypes forming from one batch of labeled rollouts, and the controller stopping a new rollout before it finishes.</p>
+    <p class="lede">The whole pipeline on the 50 released rollouts of one task, retail/103 from Tau2-Bench: behavior states as stations, rollouts as trains, the encoder folding each route into a point, prototypes forming from one batch of labeled rollouts, and the controller stopping a new rollout before it finishes. The chapters below take each step in turn.</p>
     <div class="pipeline-wrap">
       <svg id="pipeline"></svg>
       <aside class="pipeline-caption">
@@ -41,19 +51,11 @@
     </div>
   </section>
 
-  <section id="explore" class="card">
-    <div class="controls">
-      <label>Benchmark <select id="sel-benchmark"></select></label>
-      <label>Policy <select id="sel-policy"></select></label>
-      <label>Task <select id="sel-task"></select></label>
-      <span id="task-badges" class="badges"></span>
-    </div>
-    <p class="hint" id="load-status">Loading…</p>
-  </section>
-
-  <section class="card">
-    <h2>1 · Behavior-state map</h2>
-    <p class="lede">Every action–observation step of every rollout is embedded, and the steps of one task are clustered into behavior states (HDBSCAN over the joint action–observation similarity, minimum cluster size 5; unassigned steps form one outlier bin). Bar height is how many rollouts sit in a state at that step, bar colour is that state's empirical success rate, and each thin ribbon is one rollout, coloured by its final outcome. <b>Click a bar</b> to read the action–observation pairs in that state; <b>hover a ribbon</b> to follow one rollout.</p>
+  <section id="c1" class="card chapter">
+    <p class="kicker">Chapter 1 · Section 2 and Figure 1</p>
+    <h2>Rollouts are paths through behavior states</h2>
+    <p class="lede">Each step of an agentic rollout is one action and the observation it provokes. Embed both with a frozen text encoder and a rollout becomes a path through one shared action–observation space; the same task attempted fifty times gives fifty paths from the same start. Clustering the steps of one task (HDBSCAN over the joint action–observation similarity, minimum cluster size 5, unassigned steps in one outlier bin) turns those paths into routes through a small set of <b>behavior states</b>. Bar height is how many rollouts sit in a state at that step, bar colour is that state's empirical success rate, and each ribbon is one rollout coloured by its final outcome. The routes split early: some states are visited almost only by rollouts that go on to fail.</p>
+    <p class="try"><b>Try:</b> click the deep-red bar around step 13 and read the action–observation pairs that put a rollout there; hover a ribbon to follow one attempt end to end.</p>
     <div class="controls small">
       <label>Steps shown <input id="flow-steps" type="range" min="2" max="30" value="30"> <span id="flow-steps-val">30</span></label>
       <label><input id="flow-collapse" type="checkbox"> collapse uniform steps</label>
@@ -63,52 +65,120 @@
       <div class="grow"><svg id="flow"></svg></div>
       <aside id="cluster-panel" class="panel"><p class="muted">Click a bar to inspect a behavior state.</p></aside>
     </div>
+    <div class="numbers" id="n1"></div>
+    <p class="repro">Reproduce: <code>python scripts/fig_trajectory_flow.py --cell tau2:qwen --task retail/103 --steps 30</code></p>
   </section>
 
-  <section class="card">
-    <h2>2 · How Precog-RM scores a rollout</h2>
-    <p class="lede">The encoder maps a rollout (or any prefix of it) to a 128-d latent vector. A small <b>support set</b> of rollouts with known outcomes defines two prototypes, the mean latent of the passing and of the failing support rollouts; every other rollout is scored by its distance to the two. The map is a 2-D PCA view of that latent space fitted on this task. <b>Click</b> a rollout to select it, <b>shift-click</b> to move it in or out of the support set, and drag the prefix slider to watch the selected rollout's latent move as the agent acts.</p>
+  <section id="c2" class="card chapter">
+    <p class="kicker">Chapter 2 · Section 4.2, Table 1, Appendix A</p>
+    <h2>The outcome is already in the path</h2>
+    <p class="lede">If success and failure separate in this space, a classifier fit on a task's own rollouts should recover the outcome of rollouts it has not seen. It does. Within each task, stratified 3-fold cross-validation fits a nearest-centroid or RBF discriminator on the pooled representation, or a fastText model on the state-ID sequence, using about 33 labeled rollouts, and scores the held-out third. Across three benchmarks and three policy models the best per-task discriminator reaches 0.77 to 0.95 AUROC. The ceiling moves by about 0.12 across benchmarks and 0.05 across policies, with AgentClinic the consistent low performer. Two limits motivate the rest of the paper: a per-task fit transfers nothing to the next task, and its accuracy is capped by the labeled rollouts a single task provides.</p>
+    <div class="controls small"><label><input type="radio" name="t1" value="best" checked> best per-task discriminator</label><label><input type="radio" name="t1" value="PN"> Precog-RM, same folds, no per-task fitting</label></div>
+    <div id="table1" class="chart"></div>
+    <div class="numbers" id="n2"></div>
+    <p class="repro">Reproduce: <code>python scripts/print_table1.py</code></p>
+  </section>
+
+  <section id="c3" class="card chapter">
+    <p class="kicker">Chapter 3 · Section 3, Figure 2</p>
+    <h2>Learn the space instead of fitting each task</h2>
+    <p class="lede">Precog-RM is a small transformer that maps a rollout, or any prefix of it, to a 128-d latent vector: each action–observation pair is embedded and linearly projected, a two-layer encoder reads the sequence, and masked mean pooling gives one vector <b>z</b>. There is no classifier head. On a new task a handful of finished rollouts with known outcomes form the <b>support set</b>; the mean latent of its passes and of its failures are the two prototypes, and P(pass) is a softmax over the negative distances from z to each. Training is episodic over many tasks: each episode draws a support set of eight passes and eight failures, encodes queries truncated to random prefixes, and minimises the prototype-distance loss, so the encoder learns to place trajectories by where they are headed rather than by what they look like.</p>
+    <p class="try"><b>Try:</b> switch the encoder to the raw action–observation space to see the same support set and the same task before any learning. Shift-click a rollout to move it in or out of the support set and watch the prototypes and the AUROC follow.</p>
     <div class="controls small">
-      <label>Encoder <select id="sel-encoder">
-        <option value="prefix">prefix-trained (deployed in GRPO, Sec. 5)</option>
-        <option value="full">generalist, full rollouts only (Table 2)</option></select></label>
+      <label>Encoder <select id="sel-encoder"></select></label>
       <label>Support set <select id="sel-support">
         <option value="cv0">3-fold CV: fold 1 held out</option>
         <option value="cv1">3-fold CV: fold 2 held out</option>
         <option value="cv2">3-fold CV: fold 3 held out</option>
-        <option value="first8">first 8 rollouts (GRPO-style first batch)</option>
+        <option value="k1">k=1 per class (fold 1 held out)</option>
+        <option value="k2">k=2 per class</option>
+        <option value="k4">k=4 per class</option>
+        <option value="k8">k=8 per class (one GRPO batch)</option>
         <option value="custom">custom</option></select></label>
       <span id="score-badges" class="badges"></span>
     </div>
     <div class="split">
-      <div class="grow">
-        <svg id="latent"></svg>
-        <div class="controls small">
-          <label>Prefix length <input id="prefix-t" type="range" min="1" max="1" value="1"> <span id="prefix-t-val"></span></label>
-          <span id="sel-readout" class="readout"></span>
-        </div>
-        <svg id="curve"></svg>
-      </div>
+      <div class="grow"><svg id="latent"></svg></div>
       <aside class="panel">
         <h3>Scores under this support set</h3>
         <svg id="strip"></svg>
-        <p class="muted small-text">Queries only (support rollouts excluded). AUROC is over these queries. Scores are softmax over negative prototype distances, the rule the encoder was trained with.</p>
-        <div id="sel-steps" class="steps"></div>
+        <div id="auroc-table"></div>
+        <p class="muted small-text">Queries only, support rollouts excluded. P(pass) is the softmax over negative prototype distances the encoder was trained with; in the raw space it is a nearest-centroid rule.</p>
       </aside>
     </div>
+    <div class="numbers" id="n3"></div>
+    <p class="repro">Reproduce: <code>python scripts/merged_cv_table.py</code> · <code>python scripts/precog_sweep.py</code></p>
   </section>
 
-  <section class="card">
+  <section id="c4" class="card chapter">
+    <p class="kicker">Chapter 4 · Sections 4.3 and 4.4, Figure 3, Table 2</p>
+    <h2>Few shots are enough, and it carries to new tasks and policies</h2>
+    <p class="lede">Deployment offers far less than a full support set. With k labeled rollouts per class drawn from the training fold, Precog-RM beats the strongest per-task baseline at every k on every benchmark, by 0.06 to 0.12 AUROC at k=1, and at k=2 it already matches the baselines at k=8: a four-fold reduction in the labeled rollouts required. The learned space also transfers. An encoder meta-trained on one policy's rollouts still separates rollouts of a policy it never saw, and pooling all three policies gives the best or near-best column everywhere; across benchmarks transfer is partial, and recovers when the target benchmark joins the pool.</p>
+    <p class="try"><b>Try:</b> drag k. The support set in chapter 3 shrinks to match, so you can see what two labeled rollouts per class look like on the map.</p>
+    <div class="controls small"><label>k per class <input id="k-slider" type="range" min="0" max="3" value="3"> <span id="k-val">8</span></label></div>
+    <div class="charts2"><div id="fewshot" class="chart"></div><div id="gen-models" class="chart"></div></div>
+    <div id="gen-bench" class="chart"></div>
+    <div class="numbers" id="n4"></div>
+    <p class="repro">Reproduce: <code>python scripts/print_fewshot_table.py</code> · <code>python scripts/aggregate_generalization.py --check</code></p>
+  </section>
+
+  <section id="c5" class="card chapter">
+    <p class="kicker">Chapter 5 · Section 4.5, Figure 4</p>
+    <h2>It can tell before the end</h2>
+    <p class="lede">An encoder trained only on complete rollouts is at chance on prefixes. Training with queries truncated to random lengths fixes that: the <b>prefix-trained</b> encoder maps a partial trajectory into the same space as full ones and its P(pass) becomes informative long before the rollout ends. Gated on confidence, the prediction turns into a decision: stop when P(pass) rises above θ or falls below 1−θ, otherwise keep going. Sweeping θ trades the accuracy of the stopped rollouts against the generation steps saved; on Tau2-Bench and BFCLv3 θ=0.9 stops 45% and 37% of rollouts at 0.84 and 0.90 accuracy, and on AgentClinic, where the signal is weak, the model mostly abstains.</p>
+    <p class="try"><b>Try:</b> drag the prefix slider to watch the selected rollout's point travel; then move θ and see how many of this task's rollouts the controller would stop, how early, and how often it would be right.</p>
+    <div class="controls small">
+      <label>Prefix length <input id="prefix-t" type="range" min="1" max="1" value="1"> <span id="prefix-t-val"></span></label>
+      <label>θ <input id="theta" type="range" min="0.55" max="0.95" step="0.05" value="0.8"> <span id="theta-val">0.80</span></label>
+    </div>
+    <p id="sel-readout" class="readout"></p>
+    <div class="split">
+      <div class="grow"><svg id="curve"></svg><p id="theta-readout" class="readout small-text"></p><div id="gating" class="chart"></div></div>
+      <aside class="panel"><div id="sel-steps" class="steps"></div></aside>
+    </div>
+    <div class="numbers" id="n5"></div>
+    <p class="repro">Reproduce: <code>python scripts/fig_prefix_gated.py</code></p>
+  </section>
+
+  <section id="c6" class="card chapter">
+    <p class="kicker">Chapter 6 · Section 5, Table 3, Figure 5</p>
+    <h2>Inside GRPO: stop the rollout, keep the optimizer</h2>
+    <p class="lede">GRPO samples a group of sixteen rollouts per task and the generation is the compute bottleneck. The controller sits in rollout collection only: after each step it re-scores the prefix against the task's prototypes, and a rollout that crosses θ is terminated with the predicted outcome as its terminal reward. The objective, advantages and clipping are untouched. Support comes either from the run itself as rollouts finish (<b>rolling</b>) or from a pre-collected batch generated by a different policy (<b>permanent</b>), which exploits the cross-model transfer of chapter 4 and saves from the first step. Training Qwen3-8B on Tau2-Bench retail for 50 batches, the most conservative setting slightly exceeds baseline pass@1 at 10% less compute, and permanent support at θ=0.8 cuts training FLOPs by 47.3% while retaining 78% of the post-training gain. Only the loosest setting, θ=0.7 with no forced completions, crosses into degraded learning.</p>
+    <div class="controls small" id="grpo-toggles"></div>
+    <div class="charts3"><div id="grpo-reward" class="chart"></div><div id="grpo-pass" class="chart"></div><div id="grpo-flops" class="chart"></div></div>
+    <div id="grpo-frontier" class="chart"></div>
+    <div class="numbers" id="n6"></div>
+    <p class="repro">Reproduce: <code>python scripts/table_grpo.py</code> · <code>python scripts/fig_grpo_curves.py</code></p>
+  </section>
+
+  <section id="c7" class="card chapter">
+    <p class="kicker">Chapter 7 · the data release</p>
+    <h2>Explore the release</h2>
+    <p class="lede">Every figure above is computed in the browser from one task's released rollouts, embeddings and encoders. Pick another task and chapters 1, 3 and 5 and the opening map redraw for it. Tasks the encoders were meta-trained on are flagged; held-out tasks are the honest test.</p>
+    <div class="controls" id="explore">
+      <label>Benchmark <select id="sel-benchmark"></select></label>
+      <label>Policy <select id="sel-policy"></select></label>
+      <label>Task <select id="sel-task"></select></label>
+      <span id="task-badges" class="badges"></span>
+    </div>
+    <p class="hint" id="load-status">Loading…</p>
+    <p class="small-text muted">The release holds 50 rollouts per task for 200 Tau2-Bench tasks, 200 BFCLv3 tasks and 214 AgentClinic scenarios, under three policies, with step embeddings, the 21 GRPO runs and all checkpoints. <code>python scripts/download.py --part ...</code> fetches any part; <code>scripts/build_web_bundles.py</code> builds the per-task bundles this page reads.</p>
+  </section>
+
+  <section id="cite" class="card">
     <h2>Citation</h2>
 <pre>@article{gill2026divergent,
   title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
   author  = {Gill, Alexander and Gogia, Guram and Guzm\'an, Francisco},
   journal = {arXiv preprint arXiv:2610.19614},
-  year    = {2026}
+  year    = {2026},
+  url     = {http://arxiv.org/abs/2610.19614}
 }</pre>
   </section>
 </main>
-<script src="app.js?v=3"></script>
-<script src="pipeline.js?v=4"></script>
+</div>
+<script src="app.js?v=5"></script>
+<script src="charts.js?v=5"></script>
+<script src="pipeline.js?v=5"></script>
 </body>
 </html>

@@ -112,6 +112,24 @@ def encode_prefixes(model, rollouts, all_prefixes):
     return out
 
 
+RAW_DIMS = 32
+
+
+def raw_space(rollouts):
+    """Nearest-centroid baseline space: mean over steps of [action|observation] (frozen text-embedding-3-large),
+    for every prefix, reduced to RAW_DIMS principal components fitted on the 50 full-rollout vectors so the
+    browser can score it live. Returns per-rollout lists of per-prefix vectors (t = 1..T)."""
+    pooled = []
+    for r in rollouts:
+        X = np.concatenate([r["act"], r["obs"]], axis=1).astype(np.float64)
+        pooled.append(np.cumsum(X, axis=0) / np.arange(1, len(X) + 1)[:, None])
+    finals = np.stack([p[-1] for p in pooled])
+    mean = finals.mean(axis=0)
+    U, s_, Vt = np.linalg.svd(finals - mean, full_matrices=False)
+    basis = Vt[:RAW_DIMS]
+    return [np.round((p - mean) @ basis.T, ROUND).tolist() for p in pooled]
+
+
 def pca2(Z):
     Z = np.asarray(Z, dtype=np.float64)
     mean = Z.mean(axis=0)
@@ -148,6 +166,10 @@ def build(benchmark, policy, task, models, held_out):
         enc[name] = {"checkpoint": Path(MODELS[name](benchmark)).name, "platt": [m.platt_a, m.platt_b],
                      "temperature": m.temperature, "distance": getattr(m, "distance", "euclid"),
                      "prefix": name == "prefix", "pca": pca2(finals), "z": z}
+    raw = raw_space(rollouts)
+    enc["raw"] = {"checkpoint": "none: frozen text-embedding-3-large, mean-pooled [action|observation]", "platt": [1.0, 0.0],
+                  "temperature": 1.0, "distance": "euclid", "prefix": True, "pca": pca2([z[-1] for z in raw]), "z": raw,
+                  "note": f"reduced to {RAW_DIMS} principal components fitted on this task's full rollouts"}
     bundle = {
         "benchmark": benchmark, "policy": policy, "task": task, "task_id": task_label(benchmark, task),
         "domain": info.get("domain") or info.get("category"), "success_rate": info.get("success_rate"),

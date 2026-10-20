@@ -5,6 +5,7 @@ const $ = (s) => document.querySelector(s);
 // Bundles live in the dataset repo (web/ part); a local build (scripts/build_web_bundles.py -> docs/data) is used when served from localhost.
 const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 const DATA_BASE = LOCAL ? "data" : "https://huggingface.co/datasets/agill32/precog-rm/resolve/main/web";
+const DATA_V = "5";   // bump when bundle contents change
 const PASS = "#2a9d4a", FAIL = "#d13b3b", NOISE = "#b9b9b9", NOISE_STROKE = "#7b3fb3";
 const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
 const fmt = d3.format(".2f"), fmt3 = d3.format(".3f");
@@ -15,7 +16,7 @@ let S = { encoder: "prefix", preset: "cv0", support: new Set(), sel: null, t: 1 
 
 // ---------- loading ----------
 async function init() {
-  INDEX = await (await fetch(`${DATA_BASE}/index.json`)).json();
+  INDEX = await (await fetch(`${DATA_BASE}/index.json?v=${DATA_V}`)).json();
   const bms = [...new Set(INDEX.tasks.map(t => t.benchmark))];
   fill($("#sel-benchmark"), bms);
   $("#sel-benchmark").onchange = () => { refreshPolicies(); loadSelected(); };
@@ -43,7 +44,7 @@ function refreshTasks() {
 async function loadSelected() {
   const bm = $("#sel-benchmark").value, pol = $("#sel-policy").value, task = $("#sel-task").value;
   $("#load-status").textContent = `Loading ${bm}/${pol}/${task}…`;
-  B = await (await fetch(`${DATA_BASE}/${bm}/${pol}/${task}.json`)).json();
+  B = await (await fetch(`${DATA_BASE}/${bm}/${pol}/${task}.json?v=${DATA_V}`)).json();
   $("#load-status").textContent = "";
   history.replaceState(null, "", `?task=${task}`);
   const maxT = d3.max(B.rollouts, r => r.n_steps);
@@ -53,9 +54,14 @@ async function loadSelected() {
     `<span class="badge">${B.clusters.length} behavior states</span>`, `<span class="badge">up to ${maxT} steps</span>`,
     B.held_out ? `<span class="badge">held-out task (not in any encoder's training pool)</span>` : `<span class="badge warn">task was in the encoders' training pool</span>`,
   ].join("");
+  const setN = (id, items) => { const el = $(id); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
+  setN("#n1", [[B.n_rollouts, "rollouts of " + B.task_id], [B.clusters.length, "behavior states (incl. outlier bin)"], [`${Math.round(B.success_rate * 100)}%`, "success rate"], [maxT, "longest rollout, in steps"]]);
   $("#flow-steps").max = maxT; $("#flow-steps").value = Math.min(30, maxT); flowState.steps = +$("#flow-steps").value; $("#flow-steps-val").textContent = flowState.steps;
   flowState.cluster = null; $("#cluster-panel").innerHTML = `<p class="muted">Click a bar to inspect a behavior state.</p>`;
-  if (!B.encoders[S.encoder]) S.encoder = Object.keys(B.encoders)[0];
+  const ENC_LABEL = { prefix: "Precog-RM, prefix-trained (deployed in GRPO)", full: "Precog-RM, generalist, full rollouts only", raw: "raw action–observation space, no learning (nearest centroid)" };
+  const encSel = $("#sel-encoder"); encSel.innerHTML = ""; ["prefix", "full", "raw"].filter(k => B.encoders[k]).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = ENC_LABEL[k]; encSel.appendChild(o); });
+  if (!B.encoders[S.encoder]) S.encoder = Object.keys(B.encoders)[0]; encSel.value = S.encoder;
+  S.thr = B.stop_threshold; $("#theta").value = S.thr; $("#theta-val").textContent = S.thr.toFixed(2);
   S.sel = null; applyPreset();
   drawFlow(); drawScoring();
   window.PRECOG_BUNDLE = B;
@@ -66,6 +72,8 @@ $("#flow-collapse").onchange = (e) => { flowState.collapse = e.target.checked; d
 $("#sel-encoder").onchange = (e) => { S.encoder = e.target.value; drawScoring(); };
 $("#sel-support").onchange = (e) => { S.preset = e.target.value; applyPreset(); drawScoring(); };
 $("#prefix-t").oninput = (e) => { S.t = +e.target.value; drawScoring(false); };
+$("#theta").oninput = (e) => { S.thr = +e.target.value; $("#theta-val").textContent = S.thr.toFixed(2); drawScoring(false); };
+document.addEventListener("precog:k", (e) => { S.preset = `k${e.detail}`; $("#sel-support").value = S.preset; applyPreset(); drawScoring(); });
 window.addEventListener("resize", () => { if (B) { drawFlow(); drawScoring(false); } });
 
 // ---------- 1. behavior-state flow ----------
@@ -161,7 +169,8 @@ const esc = (s) => s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": 
 function applyPreset() {
   const rids = B.rollouts.map(r => r.rid);
   if (S.preset.startsWith("cv")) { const held = new Set(B.cv_folds[+S.preset[2]]); S.support = new Set(rids.filter(r => !held.has(r))); }
-  else if (S.preset === "first8") S.support = new Set(rids.slice(0, 8));
+  else if (S.preset.startsWith("k")) { const k = +S.preset.slice(1), held = new Set(B.cv_folds[0]), pass = new Map(B.rollouts.map(r => [r.rid, r.reward >= 0.5]));
+    const train = rids.filter(r => !held.has(r)); S.support = new Set([...train.filter(r => pass.get(r)).slice(0, k), ...train.filter(r => !pass.get(r)).slice(0, k)]); }
   // custom: keep as is
   if (S.sel == null || S.support.has(S.sel)) S.sel = rids.find(r => !S.support.has(r)) ?? rids[0];
 }
@@ -187,9 +196,12 @@ function drawScoring(resetT = true) {
   const supF = [...S.support].filter(r => !pass.get(r)).map(r => zFinal(idx.get(r)));
   const cp = supP.length ? mean(supP) : null, cf = supF.length ? mean(supF) : null;
   const score = scoreFn(cp, cf);
-  const queries = rolls.filter(r => !S.support.has(r.rid));
+  const heldK = S.preset.startsWith("k") ? new Set(B.cv_folds[0]) : null;
+  const queries = rolls.filter(r => !S.support.has(r.rid) && (!heldK || heldK.has(r.rid)));
   const qs = queries.map(r => score(zFinal(idx.get(r.rid)))), ql = queries.map(r => pass.get(r.rid));
   const au = auroc(qs, ql);
+  const setN3 = (items) => { const el = $("#n3"); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
+  setN3([["128-d", "latent per rollout or prefix"], ["2 prototypes", "means of the support passes and failures"], ["0 params", "fit at inference"], [isNaN(au) ? "n/a" : fmt3(au), `held-out AUROC on ${B.task_id} under this support set`]]);
   $("#score-badges").innerHTML = `<span class="badge">support: ${supP.length} pass + ${supF.length} fail</span><span class="badge">${queries.length} queries</span><span class="badge">AUROC ${isNaN(au) ? "n/a" : fmt3(au)}</span>${B.held_out ? "" : `<span class="badge warn">training-pool task</span>`}`;
   // selected rollout + prefix slider
   const sel = rolls[idx.get(S.sel)], zs = E.z[idx.get(S.sel)];
@@ -198,7 +210,7 @@ function drawScoring(resetT = true) {
   $("#prefix-t-val").textContent = E.prefix ? `${S.t} / ${sel.n_steps} steps` : "(full rollouts only for this encoder)";
   const curve = E.prefix ? zs.map(z => score(z)) : [score(zs[0])];
   const pNow = E.prefix ? curve[S.t - 1] : curve[0];
-  const thr = B.stop_threshold;
+  const thr = S.thr;
   let stopAt = null; if (E.prefix) for (let t = 0; t < curve.length; t++) if (curve[t] > thr || 1 - curve[t] > thr) { stopAt = t; break; }
   $("#sel-readout").innerHTML = `rollout <b>${sel.rid}</b> (${pass.get(sel.rid) ? "passed" : "failed"}${S.support.has(sel.rid) ? ", in support" : ""}) · P(pass) = <b>${fmt3(pNow)}</b>` +
     (E.prefix ? (stopAt != null ? ` · controller would stop after step ${stopAt + 1} predicting <b>${curve[stopAt] > thr ? "pass" : "fail"}</b> (threshold ${thr})` : ` · never crosses the ${thr} threshold`) : "");
@@ -206,6 +218,21 @@ function drawScoring(resetT = true) {
   drawCurve(curve, thr, E.prefix, stopAt);
   drawStrip(queries, qs, ql);
   drawSteps(sel);
+  // theta sweep on this task's queries (prefix encoders only)
+  if (E.prefix) {
+    let nStop = 0, nCorrect = 0, stepsSaved = 0, stepsAll = 0;
+    queries.forEach(r => { const zq = E.z[idx.get(r.rid)]; stepsAll += r.n_steps; let st = null;
+      for (let t = 0; t < zq.length; t++) { const p = score(zq[t]); if (p > thr || 1 - p > thr) { st = t; if ((p > thr) === pass.get(r.rid)) nCorrect++; break; } }
+      if (st != null) { nStop++; stepsSaved += r.n_steps - st - 1; } });
+    $("#theta-readout").innerHTML = `At θ=${thr.toFixed(2)} on this task's ${queries.length} queries: the controller stops <b>${nStop}</b> (${Math.round(100 * nStop / Math.max(1, queries.length))}%), is right on <b>${nStop ? Math.round(100 * nCorrect / nStop) : 0}%</b> of them, and skips <b>${Math.round(100 * stepsSaved / Math.max(1, stepsAll))}%</b> of their generation steps.`;
+  } else $("#theta-readout").textContent = "";
+  // AUROC of every encoder under the same support set
+  const rows = Object.entries(B.encoders).map(([k, e]) => { const zf = (i) => e.z[i][e.z[i].length - 1];
+    const sp = [...S.support].filter(r => pass.get(r)).map(r => zf(idx.get(r))), sf = [...S.support].filter(r => !pass.get(r)).map(r => zf(idx.get(r)));
+    const sc = scoreFn(sp.length ? mean(sp) : null, sf.length ? mean(sf) : null);
+    return [k, auroc(queries.map(r => sc(zf(idx.get(r.rid)))), ql)]; });
+  const NAME = { prefix: "Precog-RM prefix-trained", full: "Precog-RM generalist", raw: "raw space, nearest centroid" };
+  $("#auroc-table").innerHTML = `<table class="mini"><tr><th>encoder</th><th>AUROC</th></tr>${rows.map(([k, a]) => `<tr class="${k === S.encoder ? "on" : ""}"><td>${NAME[k] || k}</td><td>${isNaN(a) ? "n/a" : fmt3(a)}</td></tr>`).join("")}</table>`;
 }
 
 function drawLatent(E, rolls, idx, pass, cp, cf, score, zs) {
@@ -213,8 +240,10 @@ function drawLatent(E, rolls, idx, pass, cp, cf, score, zs) {
   const W = svg.node().clientWidth, H = svg.node().clientHeight, m = 28;
   const pts = rolls.map(r => { const [px, py] = proj(zFinal(idx.get(r.rid))); return { rid: r.rid, x: px, y: py, pass: pass.get(r.rid), sup: S.support.has(r.rid) }; });
   const trail = E.prefix ? zs.map(z => proj(z)) : [];
-  const allx = pts.map(p => p.x).concat(trail.map(p => p[0])), ally = pts.map(p => p.y).concat(trail.map(p => p[1]));
-  const x = d3.scaleLinear().domain(pad(d3.extent(allx))).range([m, W - m]), y = d3.scaleLinear().domain(pad(d3.extent(ally))).range([H - m, m]);
+  // fit the view to the full-rollout cloud; prefix trails may wander outside and are clipped
+  const x = d3.scaleLinear().domain(pad(d3.extent(pts, p => p.x))).range([m, W - m]), y = d3.scaleLinear().domain(pad(d3.extent(pts, p => p.y))).range([H - m, m]);
+  svg.append("clipPath").attr("id", "latent-clip").append("rect").attr("x", 0).attr("y", 0).attr("width", W).attr("height", H);
+  svg.attr("clip-path", "url(#latent-clip)");
   svg.append("text").attr("x", m).attr("y", H - 8).attr("font-size", 11).attr("fill", "#6b6b6b").text(`PCA of the ${E.checkpoint.replace(".pt", "")} latent (128-d), fitted on this task's ${rolls.length} full rollouts · explains ${Math.round((E.pca.explained[0] + E.pca.explained[1]) * 100)}% of variance`);
   // trail of the selected rollout's prefixes
   if (trail.length > 1) {

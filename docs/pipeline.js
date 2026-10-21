@@ -218,7 +218,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   const focus = S.focus, Q = S.query.r, hueIdx = new Map(S.trains.map((r, i) => [r.rid, i]));
   // ---- the rollout flowing (beat 4 flow shot, beat 6) and its progress
   let rid = null, steps = 0, prog = 0, mode = bi === 4 ? "many" : bi === 5 ? "query" : "one";
-  if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(8, steps);
+  if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(6, steps);
     prog = shot !== "flow" ? 0 : sq < 0.66 ? sub(sq, 0.05, 0.66) * slow : slow + sub(sq, 0.66, 0.9) * (steps - slow); }
   else if (mode === "query") { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.06, 0.92) * steps; }
   const hue = "#8a8a86";
@@ -328,14 +328,15 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
     if (seen === 0 && shot === "flow") { const p0 = S.trails.get(rid)[0]; L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 8).attr("fill", hue).attr("fill-opacity", 0.35).attr("stroke", hue).attr("stroke-width", 1.5);
       L.append("text").attr("x", p0[0]).attr("y", p0[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("waiting for step 1"); }
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const moving = prog < steps && f >= 0.78 && seen === t + 1, mv = moving ? ease(sub(f, 0.78, 1)) : 1;
-      const cur = seen > 1 && moving ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
+      // rest at the last reached latent; once this step's token has landed (seen === t + 1) stay there until the move window, then glide to the new one
+      const pending = prog < steps && seen === t + 1 && seen > 1, mv = pending ? d3.easeQuadInOut(sub(f, 0.74, 1)) : 1;
+      const cur = pending ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
       tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", hue).attr("stroke-width", 1).attr("opacity", 0.9);
         L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", hue).text(k + 1); });
       if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);
       L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
       const labelled = shot === "flow" ? sub(sq, 0.92, 0.98) : 0, pass = S.pass.get(rid);
-      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8 + 3 * (prog < steps ? Math.sin(Math.PI * sub(f, 0.78, 1)) : 0)).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
+      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8 + 3 * (prog < steps ? Math.sin(Math.PI * sub(f, 0.74, 1)) : 0)).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
       if (labelled > 0) icon(L, pass ? "circle-check" : "circle-x", cur[0] + 16, cur[1] - 12, 16, pass ? PASS : FAIL, labelled);
       g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`rollout 1 · step ${seen} of ${steps}`); }
   } else if (mode === "many") {
@@ -374,8 +375,9 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   } else {
     drawPrototypes(L, S, 1, true);
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const moving = prog < steps && f >= 0.78 && seen === t + 1, mv = moving ? ease(sub(f, 0.78, 1)) : 1;
-      const cur = seen > 1 && moving ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
+      // rest at the last reached latent; once this step's token has landed (seen === t + 1) stay there until the move window, then glide to the new one
+      const pending = prog < steps && seen === t + 1 && seen > 1, mv = pending ? d3.easeQuadInOut(sub(f, 0.74, 1)) : 1;
+      const cur = pending ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
       tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 1).attr("opacity", 0.9);
         L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", INK).text(k + 1); });
       if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);

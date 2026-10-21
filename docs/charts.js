@@ -14,15 +14,16 @@ async function init() {
   document.querySelectorAll("input[name=t1]").forEach(el => el.onchange = () => drawTable1());
   drawTable1(); drawFewshot(8); drawGen($("#gen-models"), R.generalization.models, "Cross-model: rows = policies in the training pool, columns = evaluated policy (Table 2)", m => ({ d: "DeepSeek", q: "Qwen", g: "GPT-5-mini" })[m] || m, c => MODEL[c]);
   drawGen($("#gen-bench"), R.generalization.benchmarks, "Cross-benchmark: rows = benchmarks in the training pool, columns = evaluated benchmark (Table 13)", r => r.replace(":g+q+d", "").replace(":all", "").split("+").map(b => BENCH[b]).join(" + "), c => BENCH[c]);
-  drawGating(); drawGrpo();
-  $("#k-slider").oninput = (e) => { const k = [1, 2, 4, 8][+e.target.value]; $("#k-val").textContent = k; drawFewshot(k); document.dispatchEvent(new CustomEvent("precog:k", { detail: k })); };
+  drawGating(); drawGrpo(); drawFalloff();
+  if ($("#k-slider")) $("#k-slider").oninput = (e) => { const k = [1, 2, 4, 8][+e.target.value]; $("#k-val").textContent = k; drawFewshot(k); document.dispatchEvent(new CustomEvent("precog:k", { detail: k })); };
   numbers();
-  window.addEventListener("resize", () => { drawTable1(); drawFewshot(+$("#k-val").textContent); drawGating(); drawGrpo(); });
+  window.addEventListener("resize", () => { drawTable1(); drawFewshot($("#k-val") ? +$("#k-val").textContent : 8); drawGating(); drawGrpo(); drawFalloff(); });
 }
 const svgIn = (el, h) => { el.innerHTML = ""; const w = el.clientWidth || 600; return [d3.select(el).append("svg").attr("viewBox", `0 0 ${w} ${h}`).attr("width", "100%"), w]; };
 const title = (svg, w, t) => svg.append("text").attr("x", 0).attr("y", 12).attr("font-size", 12).attr("fill", "#444").text(t);
 
 function drawTable1() {
+  if (!$("#table1")) return;
   const mode = document.querySelector("input[name=t1]:checked").value;
   const [svg, w] = svgIn($("#table1"), 190);
   const bs = ["tau2", "bfclv3", "agentclinic"], ms = ["deepseek", "qwen", "gpt5mini"];
@@ -41,6 +42,7 @@ function drawTable1() {
 }
 
 function drawFewshot(k) {
+  if (!$("#fewshot")) return;
   const [svg, w] = svgIn($("#fewshot"), 240);
   const m = { l: 40, r: 12, t: 24, b: 30 }, ks = [1, 2, 4, 8];
   const x = d3.scaleLog().domain([1, 8]).range([m.l, w - m.r]), y = d3.scaleLinear().domain([0.6, 0.95]).range([240 - m.b, m.t]);
@@ -60,6 +62,7 @@ function drawFewshot(k) {
 }
 
 function drawGen(el, M, t, rowLabel, colLabel) {
+  if (!el) return;
   const [svg, w] = svgIn(el, 30 + 26 * M.rows.length + 10);
   const x = d3.scaleBand().domain(M.cols).range([210, w - 10]).padding(0.05), y = d3.scaleBand().domain(M.rows).range([28, 28 + 26 * M.rows.length]).padding(0.1);
   const col = d3.scaleSequential(d3.interpolateBlues).domain([0.6, 0.95]);
@@ -78,6 +81,7 @@ function drawGen(el, M, t, rowLabel, colLabel) {
 }
 
 function drawGating() {
+  if (!$("#gating")) return;
   const [svg, w] = svgIn($("#gating"), 230);
   const m = { l: 40, r: 12, t: 24, b: 30 };
   const x = d3.scaleLinear().domain([0, 60]).range([m.l, w - m.r]), y = d3.scaleLinear().domain([0.5, 1]).range([230 - m.b, m.t]);
@@ -94,9 +98,10 @@ function drawGating() {
 }
 
 function drawGrpo() {
+  if (!$("#grpo-frontier")) return;
   const G = R.grpo, ids = G.table.map(t => t.id);
   if (!grpoOn) grpoOn = new Set(ids);
-  const tg = $("#grpo-toggles"); tg.innerHTML = "";
+  const tg = $("#grpo-toggles"); if (!tg) return; tg.innerHTML = "";
   G.table.forEach(t => {
     const lab = document.createElement("label"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = grpoOn.has(t.id);
     cb.onchange = () => { if (cb.checked) grpoOn.add(t.id); else grpoOn.delete(t.id); drawGrpo(); };
@@ -135,9 +140,30 @@ function drawGrpo() {
     svg.append("text").attr("x", px + 8).attr("y", py - 7).attr("font-size", 10).attr("fill", s.col).text(`θ=${t.theta} m_c=${t.mc}`); });
 }
 
+function drawFalloff() {
+  const el = $("#falloff"); if (!el) return;
+  const [svg, w] = svgIn(el, 300);
+  const m = { l: 44, r: 16, t: 28, b: 34 }, ks = [1, 2, 4, 8, 33];
+  const x = d3.scaleLog().domain([1, 33]).range([m.l, w - m.r]), y = d3.scaleLinear().domain([0.55, 0.97]).range([300 - m.b, m.t]);
+  title(svg, w, "Per-task classifiers need labeled rollouts of the task at hand (best baseline, held-out AUROC)");
+  svg.append("g").attr("transform", `translate(0,${300 - m.b})`).call(d3.axisBottom(x).tickValues(ks).tickFormat(d3.format("d"))).selectAll("text").style("font-size", "11px");
+  svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5)).selectAll("text").style("font-size", "11px");
+  svg.append("text").attr("x", w - m.r).attr("y", 300 - 6).attr("text-anchor", "end").attr("font-size", 11).attr("fill", "#6b6b6b").text("labeled rollouts per class, same task (log)");
+  Object.entries(R.fewshot).forEach(([b, byK]) => {
+    const full = d3.mean(R.table1.rows.filter(r => r.benchmark === b), r => r.methods[r.best_baseline][0]);
+    const pts = [1, 2, 4, 8].map(k => [k, d3.max(["NC", "RBF", "FT1"], mm => byK[String(k)][mm])]).concat([[33, full]]);
+    svg.append("path").attr("d", d3.line().x(d => x(d[0])).y(d => y(d[1])).curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", BCOL[b]).attr("stroke-width", 2.5);
+    svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", d => x(d[0])).attr("cy", d => y(d[1])).attr("r", 4).attr("fill", BCOL[b]);
+    svg.append("text").attr("x", x(33) - 6).attr("y", y(full) - 8).attr("text-anchor", "end").attr("font-size", 11).attr("fill", BCOL[b]).text(BENCH[b]);
+  });
+  const lx = x(2), ly = y(0.6); const lock = svg.append("g").attr("transform", `translate(${lx},${ly})`);
+  lock.append("rect").attr("x", -6).attr("y", -4).attr("width", 12).attr("height", 10).attr("rx", 2).attr("fill", "none").attr("stroke", "#6b6b6b").attr("stroke-width", 1.5);
+  lock.append("path").attr("d", "M-3,-4 v-3 a3,3 0 0 1 6,0 v3").attr("fill", "none").attr("stroke", "#6b6b6b").attr("stroke-width", 1.5);
+  svg.append("text").attr("x", lx + 12).attr("y", ly + 4).attr("font-size", 11).attr("fill", "#6b6b6b").text("and none of it transfers to the next task");
+}
 function numbers() {
   const t1 = R.table1.rows, best = t1.map(r => r.methods[r.best_baseline][0]);
-  const set = (id, items) => { $(id).innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
+  const set = (id, items) => { if (!$(id)) return; $(id).innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
   set("#n2", [[`${fmt3(d3.min(best))}–${fmt3(d3.max(best))}`, "best per-task AUROC across the 9 cells"], ["~33", "labeled rollouts per fit"], [`${t1.filter(r => (r.methods.PN || [0])[0] >= r.methods[r.best_baseline][0] - 0.0005).length} of 9`, "cells where Precog-RM matches or beats the best per-task fit"]]);
   const f = R.fewshot; const marg = Object.values(f).map(b => b["1"].ProtoNet - d3.max(["NC", "RBF", "FT1"], m => b["1"][m]));
   set("#n4", [[`+${fmt3(d3.min(marg))} to +${fmt3(d3.max(marg))}`, "AUROC margin over the best baseline at k=1"], ["k=2 ≈ baseline k=8", "four-fold fewer labeled rollouts"], [fmt3(R.generalization.models.matrix[6].reduce((a, b) => a + b, 0) / 3), "mean held-out AUROC, all-policy pool"]]);

@@ -72,7 +72,7 @@ $("#flow-collapse").onchange = (e) => { flowState.collapse = e.target.checked; d
 $("#sel-encoder").onchange = (e) => { S.encoder = e.target.value; drawScoring(); };
 $("#sel-support").onchange = (e) => { S.preset = e.target.value; applyPreset(); drawScoring(); };
 $("#prefix-t").oninput = (e) => { S.t = +e.target.value; drawScoring(false); };
-$("#theta").oninput = (e) => { S.thr = +e.target.value; $("#theta-val").textContent = S.thr.toFixed(2); drawScoring(false); };
+if ($("#theta")) $("#theta").oninput = (e) => { S.thr = +e.target.value; $("#theta-val").textContent = S.thr.toFixed(2); drawScoring(false); };
 document.addEventListener("precog:k", (e) => { S.preset = `k${e.detail}`; $("#sel-support").value = S.preset; applyPreset(); drawScoring(); });
 window.addEventListener("resize", () => { if (B) { drawFlow(); drawScoring(false); } });
 

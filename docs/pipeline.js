@@ -114,12 +114,13 @@ function buildScene(b) {
 function beatAt(p) { for (let i = 0; i < BEATS.length; i++) if (p < BEATS[i].t1 || i === BEATS.length - 1) return [i, clamp01((p - BEATS[i].t0) / (BEATS[i].t1 - BEATS[i].t0))]; }
 const sub = (q, a, b) => clamp01((q - a) / (b - a));
 
-function render(p) {
-  if (!scene) return;
-  const svg = d3.select("#pipeline"); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
-  const S = scene, [bi, q] = beatAt(p), g = svg.append("g");
-  $("#pipeline-title").textContent = BEATS[bi].title; $("#pipeline-text").textContent = BEATS[bi].text;
-  document.querySelectorAll("#pipeline-beats button").forEach((el, i) => el.classList.toggle("on", i === bi));
+function render(p) { if (!scene) return; renderScene(document.querySelector("#pipeline"), scene, p, true); }
+function renderScene(svgNode, S, p, captions = false) {
+  if (!svgNode || !S) return;
+  const svg = d3.select(svgNode); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const [bi, q] = beatAt(p), g = svg.append("g");
+  if (captions) { $("#pipeline-title").textContent = BEATS[bi].title; $("#pipeline-text").textContent = BEATS[bi].text;
+    document.querySelectorAll("#pipeline-beats button").forEach((el, i) => el.classList.toggle("on", i === bi)); }
   const zoom = bi < 1 ? 0 : bi === 1 ? ease(sub(q, 0, 0.35)) : 1;                       // whole rollout -> sixteen lanes
   const group1 = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.05, 0.3)) : 1;                    // the focus column merges
   const group = bi < 2 ? 0 : bi === 2 ? ease(sub(q, 0.34, 0.54)) : 1;                     // every column merges
@@ -503,10 +504,11 @@ function initControls() {
   $("#pipeline-scrub").oninput = (e) => setProg(+e.target.value / 1000, true);
   $("#pipeline-play").onclick = () => playing ? stop() : play();
 }
-initControls();
-function load(b) { B = b; scene = buildScene(B); render(prog); }
+const hasOpener = !!$("#pipeline-section");
+if (hasOpener) initControls();
+function load(b) { B = b; scene = buildScene(B); if (hasOpener) render(prog); document.dispatchEvent(new CustomEvent("precog:scene", { detail: scene })); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);
-const io = new IntersectionObserver((es) => { if (es.some(x => x.isIntersecting) && scene && !playing && prog === 0) play(); }, { threshold: 0.4 });
-io.observe($("#pipeline-section"));
+if (hasOpener) { const io = new IntersectionObserver((es) => { if (es.some(x => x.isIntersecting) && scene && !playing && prog === 0) play(); }, { threshold: 0.4 }); io.observe($("#pipeline-section")); }
+window.PrecogPipeline = { buildScene, renderScene, BEATS, W, H, get scene() { return scene; } };
 })();

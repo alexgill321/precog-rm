@@ -98,7 +98,7 @@ function buildScene(b) {
   const latent = new Map([...finals].map(([rid, p]) => [rid, L(p)]));
   // drawn trails: an exponential smoothing of the prefix latents whose weight on the newest point rises to 1 at the last step,
   // so each step nudges the point and the trail still ends exactly at the rollout's final latent
-  const smooth = (pts) => { const out = []; pts.forEach((pt, t) => { const T = pts.length, a = T <= 1 ? 1 : 0.5 + 0.5 * Math.pow(t / (T - 1), 3);
+  const smooth = (pts) => { const out = []; pts.forEach((pt, t) => { const T = pts.length, a = T <= 1 ? 1 : 0.25 + 0.75 * Math.pow(t / (T - 1), 4);
     out.push(t === 0 ? pt : [lerp(out[t - 1][0], pt[0], a), lerp(out[t - 1][1], pt[1], a)]); }); return out; };
   const trails = new Map(rolls.map(r => [r.rid, smooth(E.z[idx.get(r.rid)].map(z => L(proj(z))))]));
   const hull = (ids) => { const pts = ids.map(rid => latent.get(rid)); return d3.polygonHull(pts) || pts; };
@@ -282,10 +282,10 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   const encAct = shot === "enc" && anim != null ? { arr: sub(anim, 0, 0.55) * 6, lines: sub(anim, 0.3, 0.7), lp: sub(anim, 0.6, 1) } : null;
   const nTokReal = mode === "many" ? 0 : Math.min(seen, 12);
   const ghosts = nTokReal === 0 && (shot === "enc" || shot === "over" || shot === "pool") ? (encAct ? Math.min(6, Math.ceil(encAct.arr)) : 6) : 0;
-  const nTok = nTokReal || ghosts, topY = 40, botY = ST.h - 26, pitch = nTok <= 1 ? 12 : Math.min(12, (botY - topY) / (nTok - 1));
+  const nTok = nTokReal || ghosts, topY = 54, botY = ST.h - 26, pitch = nTok <= 1 ? 12 : Math.min(11, (botY - topY) / (nTok - 1));
   const tokY = (j) => nTok <= 1 ? (topY + botY) / 2 : topY + j * pitch, TOKX = 30, L1X = 104, L2X = 160, nodeY = tokY;
   const tokN = 4, tokCh = Math.max(0.8, Math.min(1.9, (pitch - 2.5) / tokN - 0.3)), tokCw = 7;
-  [[L1X, "layer 1"], [L2X, "layer 2"]].forEach(([x, lab]) => { inEnc.append("rect").attr("x", x - 9).attr("y", topY - 10).attr("width", 18).attr("height", botY - topY + 20).attr("rx", 9).attr("fill", "#f1f1ee");
+  [[L1X, "layer 1"], [L2X, "layer 2"]].forEach(([x, lab]) => { inEnc.append("rect").attr("x", x - 9).attr("y", topY - 8).attr("width", 18).attr("height", botY - topY + 16).attr("rx", 9).attr("fill", "#f1f1ee");
     inEnc.append("text").attr("x", x).attr("y", ST.h - 7).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(lab); });
   const linesOp = encAct ? 0.12 * encAct.lines : (shot === "over" || shot === "pool" || nTokReal > 0 ? 0.12 : 0);
   if (linesOp > 0 && nTok > 0) for (let j = 0; j < nTok; j++) for (let k = 0; k < nTok; k++) {
@@ -303,7 +303,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   if (ghosts) d3.range(ghosts).forEach(j => inEnc.append("text").attr("x", TOKX - 10).attr("y", tokY(j) + 2).attr("text-anchor", "end").attr("font-size", 5.5).attr("fill", MUTED).text(`t${j + 1}`));
   inEnc.append("text").attr("x", TOKX).attr("y", ST.h - 7).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(nTokReal ? `${seen} step${seen > 1 ? "s" : ""}` : "steps");
   arrowTo(inEnc, L2X + 12, ST.encW - 10, (topY + botY) / 2, 0.8);
-  if (encAct) [L1X, L2X].forEach((x, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", x - 9).attr("y", topY - 10).attr("width", 18).attr("height", botY - topY + 20).attr("rx", 9).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); });
+  if (encAct) [L1X, L2X].forEach((x, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", x - 9).attr("y", topY - 8).attr("width", 18).attr("height", botY - topY + 16).attr("rx", 9).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); });
   // -- pool: the layer-2 outputs average into one 128-d column, z
   const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`).attr("clip-path", "url(#clip-inPool)");
   const poolAct = shot === "pool" && anim != null ? { merge: ease(sub(anim, 0, 0.45)), drop: ease(sub(anim, 0.55, 1)) } : null;
@@ -325,6 +325,8 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   // ---- latent panel contents
   const L = g.append("g");
   if (mode === "one") {
+    if (seen === 0 && shot === "flow") { const p0 = S.trails.get(rid)[0]; L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 8).attr("fill", hue).attr("fill-opacity", 0.35).attr("stroke", hue).attr("stroke-width", 1.5);
+      L.append("text").attr("x", p0[0]).attr("y", p0[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("waiting for step 1"); }
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
       const mv = prog >= steps ? 1 : ease(sub(f, 0.78, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
       tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", hue).attr("stroke-width", 1).attr("opacity", 0.9);
@@ -347,7 +349,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
     if (flowing) { const { r, fI, h } = flowing, icr = S.icons.get(r.rid), ocr = S.obs.get(r.rid);
       for (let k = 0; k < Math.min(11, r.n_steps); k++) pair(g, slot(k), YC, icr[k], ocr[k], 4, 0.9 * (1 - fI));
       const x = lerp(ST.embX + 115, ST.encX + 30, ease(fI)); vcol(g, x, ST.y + 36 + (catH - shortH) / 2, SHORT.n, SHORT.cw, SHORT.ch, "ao", r.rid * 7, 1, true, SHORT.n, SHORT.gap);
-      const nT = Math.min(12, r.n_steps), ty_ = (j) => 40 + j * Math.min(12, (ST.h - 66) / Math.max(1, nT - 1));
+      const nT = Math.min(12, r.n_steps), ty_ = (j) => 54 + j * Math.min(11, (ST.h - 80) / Math.max(1, nT - 1));
       for (let j = 0; j < nT; j++) vcol(inEnc, 30, ty_(j) - 4, 4, 7, 1.7, "ao", r.rid * 7 + j * 3, fI, true, 4, 0.3); }
     g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${Math.min(others.length, Math.floor(sub(q, 0.02, 0.57) * others.length)) + 1} of ${S.trains.length} labeled rollouts`);
     if (proto > 0) drawPrototypes(L, S, proto, false);

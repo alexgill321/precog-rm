@@ -221,7 +221,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(8, steps);
     prog = shot !== "flow" ? 0 : sq < 0.66 ? sub(sq, 0.05, 0.66) * slow : slow + sub(sq, 0.66, 0.9) * (steps - slow); }
   else if (mode === "query") { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.06, 0.92) * steps; }
-  const hue = mode === "query" ? "#8a8a86" : hueOf(hueIdx.get(rid) ?? 0);
+  const hue = "#8a8a86";
   const t = Math.min(Math.max(steps - 1, 0), Math.floor(prog)), f = prog >= steps ? 1 : prog - Math.floor(prog);
   const seen = steps ? Math.min(t + (f >= 0.74 || prog >= steps ? 1 : 0), steps) : 0;
   // ---- architecture (always drawn)
@@ -328,7 +328,8 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
     if (seen === 0 && shot === "flow") { const p0 = S.trails.get(rid)[0]; L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 8).attr("fill", hue).attr("fill-opacity", 0.35).attr("stroke", hue).attr("stroke-width", 1.5);
       L.append("text").attr("x", p0[0]).attr("y", p0[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", MUTED).text("waiting for step 1"); }
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.78, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const moving = prog < steps && f >= 0.78 && seen === t + 1, mv = moving ? ease(sub(f, 0.78, 1)) : 1;
+      const cur = seen > 1 && moving ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
       tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", hue).attr("stroke-width", 1).attr("opacity", 0.9);
         L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", hue).text(k + 1); });
       if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);
@@ -339,21 +340,20 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
       g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`rollout 1 · step ${seen} of ${steps}`); }
   } else if (mode === "many") {
     // the sixteen labeled rollouts, listed on the left and fed through one by one
-    const others = S.trains.slice(1), per = 0.55 / others.length, label = ease(sub(q, 0.6, 0.72)), proto = ease(sub(q, 0.76, 1));
+    const others = S.trains.slice(1), per = 0.62 / others.length, proto = ease(sub(q, 0.72, 1));
     const rowY = (i) => ST.y + 9 + i * 9.4, rowX = ST.qX, rowW = 118;
     const miniStrip = (gg, x, y, r, op) => { const n = Math.min(7, r.n_steps); for (let k = 0; k < n; k++) { gg.append("rect").attr("x", x + k * 5.4).attr("y", y - 3.2).attr("width", 3.8).attr("height", 2.8).attr("fill", d3.hsl(SCHEME.a, 0.6, 0.45 + 0.3 * hash(r.rid, k, 1)).formatHex()).attr("opacity", op);
       gg.append("rect").attr("x", x + k * 5.4).attr("y", y + 0.4).attr("width", 3.8).attr("height", 2.8).attr("fill", d3.hsl(SCHEME.o, 0.6, 0.45 + 0.3 * hash(r.rid, k, 2)).formatHex()).attr("opacity", op); } };
     let flowing = null, nDone = 1;
     S.trains.forEach((r, i) => {
-      const y = rowY(i), h = i === 0 ? null : hueOf(i), pass = S.pass.get(r.rid);
+      const y = rowY(i), pass = S.pass.get(r.rid), h = pass ? PASS : FAIL;
       const fI = i === 0 ? 1 : sub(q, 0.02 + (i - 1) * per, 0.02 + i * per);
       const done = fI >= 1, active = fI > 0 && fI < 1;
       if (done && i > 0) nDone++;
       if (active) { flowing = { r, fI, h, y }; g.append("rect").attr("x", rowX - 3).attr("y", y - 4.5).attr("width", rowW + 6).attr("height", 9).attr("rx", 4).attr("fill", ACT_BG); }
-      g.append("circle").attr("cx", rowX + 3).attr("cy", y).attr("r", 2.8).attr("fill", i === 0 ? (S.pass.get(r.rid) ? PASS : FAIL) : done ? d3.interpolateRgb(h, pass ? PASS : FAIL)(clamp01(label * 1.4 - (i - 1) * 0.025)) : h).attr("opacity", done || active ? 1 : 0.45);
+      g.append("circle").attr("cx", rowX + 3).attr("cy", y).attr("r", 2.8).attr("fill", done || active ? h : "#b5b5b0").attr("opacity", done || active ? 1 : 0.6);
       miniStrip(g, rowX + 9, y, r, active ? 1 - fI : done ? 0.9 : 0.4);
-      const li = i === 0 ? 1 : clamp01(label * 1.4 - (i - 1) * 0.025);
-      if (li > 0 && (done || i === 0)) icon(g, pass ? "circle-check" : "circle-x", rowX + rowW - 4, y, 6.5, pass ? PASS : FAIL, li);
+      if (done) icon(g, pass ? "circle-check" : "circle-x", rowX + rowW - 4, y, 6.5, pass ? PASS : FAIL, 1);
     });
     g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${nDone} of ${S.trains.length} labeled rollouts encoded`);
     // the active rollout: its strip slides into the embedder, its vector flows to the encoder, its point lands
@@ -367,14 +367,15 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
     const p0 = S.latent.get(focus.rid);
     L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 6.5).attr("fill", S.pass.get(focus.rid) ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.5);
     others.forEach((r, i) => { const fI = sub(q, 0.02 + i * per, 0.02 + (i + 1) * per); if (fI <= 0) return;
-      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid), h = hueOf(i + 1);
+      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid), h = pass ? PASS : FAIL;
       if (fI < 1) { const land = ease(sub(fI, 0.75, 1)); if (land > 0) { const from = [ST.zX, YC + 12]; L.append("circle").attr("cx", lerp(from[0], pt[0], land)).attr("cy", lerp(from[1], pt[1], land)).attr("r", 6.5).attr("fill", h).attr("stroke", "#fff").attr("stroke-width", 1.5); } }
-      else { const li = clamp01(label * 1.4 - i * 0.025); L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5).attr("fill", d3.interpolateRgb(h, pass ? PASS : FAIL)(li)).attr("stroke", "#fff").attr("stroke-width", 1.5); } });
+      else L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5).attr("fill", h).attr("stroke", "#fff").attr("stroke-width", 1.5); });
     if (proto > 0) drawPrototypes(L, S, proto, false);
   } else {
     drawPrototypes(L, S, 1, true);
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.78, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const moving = prog < steps && f >= 0.78 && seen === t + 1, mv = moving ? ease(sub(f, 0.78, 1)) : 1;
+      const cur = seen > 1 && moving ? [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)] : [to[0], to[1]];
       tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 1).attr("opacity", 0.9);
         L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", INK).text(k + 1); });
       if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);

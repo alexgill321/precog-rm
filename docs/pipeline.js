@@ -7,7 +7,7 @@
 const PASS = "#2a9d4a", FAIL = "#d13b3b", NOISE = "#b9b9b9", NOISE_STROKE = "#7b3fb3", INK = "#1c1c1c", MUTED = "#8a8a86";
 const ACT = "#2b5fb3", ACT_BG = "#e8eefc", OBS = "#8a5a00", OBS_BG = "#f7ecd9";
 const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
-const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 125000;
+const W = 900, H = 440, STEPS = 12, K_SUP = 8, INTRO_STEPS = 8, LANES = 16, DUR = 140000;
 const BEATS = [
   { t0: 0.00, t1: 0.14, title: "One task, one attempt", text: "The agent acts; the user or the system answers. The outcome is known only at the end." },
   { t0: 0.14, t1: 0.22, title: "Same task, sixteen attempts", text: "Different moves, different endings." },
@@ -96,7 +96,11 @@ function buildScene(b) {
   const lx = d3.scaleLinear().domain([d3.min(fx) - padx, d3.max(fx) + padx]).range([540, 870]), ly = d3.scaleLinear().domain([d3.min(fy) - pady, d3.max(fy) + pady]).range([425, 245]);
   const L = (p) => [lx(p[0]), ly(p[1])];
   const latent = new Map([...finals].map(([rid, p]) => [rid, L(p)]));
-  const trails = new Map(rolls.map(r => [r.rid, E.z[idx.get(r.rid)].map(z => L(proj(z)))]));
+  // drawn trails: an exponential smoothing of the prefix latents whose weight on the newest point rises to 1 at the last step,
+  // so each step nudges the point and the trail still ends exactly at the rollout's final latent
+  const smooth = (pts) => { const out = []; pts.forEach((pt, t) => { const T = pts.length, a = T <= 1 ? 1 : 0.5 + 0.5 * Math.pow(t / (T - 1), 3);
+    out.push(t === 0 ? pt : [lerp(out[t - 1][0], pt[0], a), lerp(out[t - 1][1], pt[1], a)]); }); return out; };
+  const trails = new Map(rolls.map(r => [r.rid, smooth(E.z[idx.get(r.rid)].map(z => L(proj(z))))]));
   const hull = (ids) => { const pts = ids.map(rid => latent.get(rid)); return d3.polygonHull(pts) || pts; };
   const laneY = (i) => 46 + i * (344 / (LANES - 1));
   const focus = trains[0];
@@ -196,11 +200,13 @@ const camLerp = (a, b, t) => ({ k: lerp(a.k, b.k, t), tx: lerp(a.tx, b.tx, t), t
 function drawModel(gRoot, S, bi, q, fadeIn) {
   const Bd = window.PRECOG_BUNDLE, idxOf = (rid) => Bd.rollouts.findIndex(r => r.rid === rid);
   const defs = gRoot.append("defs");
+  [["inEmb", ST.embX, ST.embW], ["inPrj", ST.prjX, ST.prjW], ["inEnc", ST.encX, ST.encW], ["inPool", ST.poolX, ST.poolW]].forEach(([n, x, w]) =>
+    defs.append("clipPath").attr("id", `clip-${n}`).append("rect").attr("x", 1).attr("y", 1).attr("width", w - 2).attr("height", ST.h - 2).attr("rx", 11));
   defs.append("marker").attr("id", "arrowG").attr("viewBox", "0 0 10 10").attr("refX", 9).attr("refY", 5).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto").append("path").attr("d", "M0,0 L10,5 L0,10 z").attr("fill", "#b5b5b0");
   // ---- shots of beat 4
   let shot = "flow", cam = camera(CAM.over), sq = 0;
   if (bi === 3) {
-    const shots = [["over", 0, 0.12], ["emb", 0.12, 0.30], ["prj", 0.30, 0.42], ["enc", 0.42, 0.62], ["pool", 0.62, 0.70], ["flow", 0.70, 1]];
+    const shots = [["over", 0, 0.08], ["emb", 0.08, 0.22], ["prj", 0.22, 0.32], ["enc", 0.32, 0.48], ["pool", 0.48, 0.55], ["flow", 0.55, 1]];
     const i = shots.findIndex(([, a, b]) => q >= a && q < b), cur = shots[Math.max(0, i)];
     shot = cur[0]; sq = sub(q, cur[1], cur[2]);
     const target = camera(CAM[shot === "flow" ? "over" : shot]), prev = camera(CAM[i > 0 ? (shots[i - 1][0] === "flow" ? "over" : shots[i - 1][0]) : "over"]);
@@ -212,15 +218,15 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   const focus = S.focus, Q = S.query.r, hueIdx = new Map(S.trains.map((r, i) => [r.rid, i]));
   // ---- the rollout flowing (beat 4 flow shot, beat 6) and its progress
   let rid = null, steps = 0, prog = 0, mode = bi === 4 ? "many" : bi === 5 ? "query" : "one";
-  if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(10, steps);
-    prog = shot !== "flow" ? 0 : sq < 0.78 ? sub(sq, 0.06, 0.78) * slow : slow + sub(sq, 0.78, 0.9) * (steps - slow); }
+  if (mode === "one") { rid = focus.rid; steps = focus.n_steps; const slow = Math.min(8, steps);
+    prog = shot !== "flow" ? 0 : sq < 0.66 ? sub(sq, 0.05, 0.66) * slow : slow + sub(sq, 0.66, 0.9) * (steps - slow); }
   else if (mode === "query") { rid = Q.rid; steps = Q.n_steps; prog = sub(q, 0.06, 0.92) * steps; }
   const hue = mode === "query" ? "#8a8a86" : hueOf(hueIdx.get(rid) ?? 0);
   const t = Math.min(Math.max(steps - 1, 0), Math.floor(prog)), f = prog >= steps ? 1 : prog - Math.floor(prog);
-  const seen = steps ? Math.min(t + (f >= 0.35 || prog >= steps ? 1 : 0), steps) : 0;
+  const seen = steps ? Math.min(t + (f >= 0.74 || prog >= steps ? 1 : 0), steps) : 0;
   // ---- architecture (always drawn)
   g.append("text").attr("x", ST.qX).attr("y", ST.y - 16).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text("Precog-RM");
-  const encPulse = mode !== "many" && prog > 0 && prog < steps ? Math.sin(Math.PI * f) : 0;
+  const encPulse = mode !== "many" && prog > 0 && prog < steps ? Math.sin(Math.PI * sub(f, 0.74, 0.92)) : 0;
   stage(g, ST.embX, ST.embW, "embed", "frozen text encoder · 3072-d", 1);
   stage(g, ST.prjX, ST.prjW, "project", "linear · 128-d", 1);
   stage(g, ST.encX, ST.encW, "encode", "transformer, 2 layers", 1, encPulse);
@@ -239,18 +245,18 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   // ---- inside the stages: vectors as they are actually processed
   const F = S.focusSteps, fs = F[Math.min(t, F.length - 1)];
   const seed = (rid ?? 0) * 7 + t * 3;
-  const HALF = 16, TALL = { n: HALF, cw: 9, ch: 2.6, gap: 0.6 }, CAT = { n: 2 * HALF, cw: 9, ch: 2.6, gap: 0.6 }, SHORT = { n: 8, cw: 9, ch: 4.6, gap: 1 };
+  const HALF = 14, TALL = { n: HALF, cw: 9, ch: 2.6, gap: 0.6 }, CAT = { n: 2 * HALF, cw: 9, ch: 2.6, gap: 0.6 }, SHORT = { n: 8, cw: 9, ch: 4.6, gap: 1 };
   const halfH = HALF * (TALL.ch + TALL.gap), catH = 2 * halfH, shortH = SHORT.n * (SHORT.ch + SHORT.gap);
   const ex = (t_, n) => { t_ = clean(t_); return t_.length > n ? t_.slice(0, n - 1) + "…" : t_; };
   // -- embed: texts in; a (blue) and o (orange) vectors out, then stacked into one concatenated vector
-  const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`);
+  const inEmb = g.append("g").attr("transform", `translate(${ST.embX},${ST.y})`).attr("clip-path", "url(#clip-inEmb)");
   const embAct = shot === "emb" && anim != null ? { arrive: ease(sub(anim, 0, 0.18)), fa: sub(anim, 0.2, 0.45), fo: sub(anim, 0.35, 0.6), stack: ease(sub(anim, 0.68, 0.92)) } : null;
   const embOp = embAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f < 0.55 ? 1 : 0.35) : 1;
   inEmb.append("text").attr("x", 10).attr("y", 50).attr("font-size", 6).attr("fill", ACT).attr("opacity", embOp).text(ex(fs ? fs.at : "", 22));
   inEmb.append("text").attr("x", 10).attr("y", 60).attr("font-size", 6).attr("fill", OBS).attr("opacity", embOp).text(ex(fs ? fs.ot : "", 22));
   inEmb.append("text").attr("x", 10).attr("y", 74).attr("font-size", 6).attr("fill", MUTED).attr("opacity", embOp).text("text → vector");
   arrowTo(inEmb, 60, 86, 98, embOp * 0.8);
-  const catTop = 36, aTop = catTop, oTopSide = catTop, oTopStack = catTop + halfH, xA = 104, xO = 126, xCat = 115;
+  const catTop = 48, aTop = catTop, oTopSide = catTop, oTopStack = catTop + halfH, xA = 104, xO = 126, xCat = 115;
   const stack = embAct ? embAct.stack : 1;                                       // 1 = already concatenated (overview and flow)
   const xa = lerp(xA, xCat, stack), xo = lerp(xO, xCat, stack), oTop = lerp(oTopSide, oTopStack, stack);
   vcol(inEmb, xa, aTop, HALF, TALL.cw, TALL.ch, "a", seed, embOp, true, embAct ? Math.round(HALF * embAct.fa) : HALF, TALL.gap);
@@ -260,10 +266,10 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   inEmb.append("text").attr("x", xCat).attr("y", catTop + catH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(stack > 0.5 ? "[a ; o] · 2 × 3072-d" : "3072-d each");
   if (embAct && embAct.arrive < 1) pair(g, lerp(slot(0), ST.embX + 24, embAct.arrive), YC, fs ? fs.ai : "message-square", fs ? fs.oi : "user", 4 + embAct.arrive, 1);
   // -- project: the concatenated vector squeezed through W into a short one
-  const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`);
+  const inPrj = g.append("g").attr("transform", `translate(${ST.prjX},${ST.y})`).attr("clip-path", "url(#clip-inPrj)");
   const prjAct = shot === "prj" && anim != null ? { sq: ease(sub(anim, 0.1, 0.6)), out: sub(anim, 0.45, 0.9) } : null;
   const prjOp = prjAct ? 1 : (shot === "flow" || mode !== "one") ? (prog > 0 && f >= 0.4 && f < 0.75 ? 1 : 0.35) : 1;
-  const sqz = prjAct ? prjAct.sq : 0, tallTop = 36, shortTop = 36 + (catH - shortH) / 2;
+  const sqz = prjAct ? prjAct.sq : 0, tallTop = 48, shortTop = 48 + (catH - shortH) / 2;
   vcol(inPrj, lerp(18, 44, sqz), lerp(tallTop, shortTop + 6, sqz), CAT.n, lerp(7, 4, sqz), lerp(CAT.ch, 1.1, sqz), "ao", seed, prjOp * (1 - 0.5 * sqz), true, CAT.n, lerp(CAT.gap, 0.3, sqz));
   inPrj.append("rect").attr("x", 44).attr("y", shortTop - 6).attr("width", 24).attr("height", shortH + 12).attr("rx", 3).attr("fill", "#fff").attr("stroke", prjAct ? ACT : "#c9c9c3").attr("stroke-width", prjAct ? 1 + Math.sin(Math.PI * sqz) : 1);
   inPrj.append("text").attr("x", 56).attr("y", shortTop + shortH / 2 + 3).attr("text-anchor", "middle").attr("font-size", 8).attr("fill", INK).text("W");
@@ -272,20 +278,20 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   inPrj.append("text").attr("x", 92).attr("y", shortTop + shortH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text("128-d");
   inPrj.append("text").attr("x", 18).attr("y", tallTop + catH + 10).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).attr("opacity", 1 - sqz).text("6144-d");
   // -- encode: the sequence flows left to right. tokens stack down the left edge; layer 1 and layer 2 are vertical columns of nodes
-  const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`);
+  const inEnc = g.append("g").attr("transform", `translate(${ST.encX},${ST.y})`).attr("clip-path", "url(#clip-inEnc)");
   const encAct = shot === "enc" && anim != null ? { arr: sub(anim, 0, 0.55) * 6, lines: sub(anim, 0.3, 0.7), lp: sub(anim, 0.6, 1) } : null;
   const nTokReal = mode === "many" ? 0 : Math.min(seen, 12);
   const ghosts = nTokReal === 0 && (shot === "enc" || shot === "over" || shot === "pool") ? (encAct ? Math.min(6, Math.ceil(encAct.arr)) : 6) : 0;
-  const nTok = nTokReal || ghosts, topY = 40, botY = ST.h - 26, pitch = nTok <= 1 ? 0 : Math.min(12, (botY - topY) / (nTok - 1));
+  const nTok = nTokReal || ghosts, topY = 40, botY = ST.h - 26, pitch = nTok <= 1 ? 12 : Math.min(12, (botY - topY) / (nTok - 1));
   const tokY = (j) => nTok <= 1 ? (topY + botY) / 2 : topY + j * pitch, TOKX = 30, L1X = 104, L2X = 160, nodeY = tokY;
-  const tokN = 4, tokCh = Math.min(1.9, (pitch - 2.5) / tokN - 0.3), tokCw = 7;
+  const tokN = 4, tokCh = Math.max(0.8, Math.min(1.9, (pitch - 2.5) / tokN - 0.3)), tokCw = 7;
   [[L1X, "layer 1"], [L2X, "layer 2"]].forEach(([x, lab]) => { inEnc.append("rect").attr("x", x - 9).attr("y", topY - 10).attr("width", 18).attr("height", botY - topY + 20).attr("rx", 9).attr("fill", "#f1f1ee");
     inEnc.append("text").attr("x", x).attr("y", ST.h - 7).attr("text-anchor", "middle").attr("font-size", 6.5).attr("fill", MUTED).text(lab); });
   const linesOp = encAct ? 0.12 * encAct.lines : (shot === "over" || shot === "pool" || nTokReal > 0 ? 0.12 : 0);
   if (linesOp > 0 && nTok > 0) for (let j = 0; j < nTok; j++) for (let k = 0; k < nTok; k++) {
     inEnc.append("line").attr("x1", TOKX + 6).attr("y1", tokY(j)).attr("x2", L1X - 4).attr("y2", nodeY(k)).attr("stroke", INK).attr("stroke-opacity", linesOp);
     inEnc.append("line").attr("x1", L1X + 4).attr("y1", nodeY(j)).attr("x2", L2X - 4).attr("y2", nodeY(k)).attr("stroke", INK).attr("stroke-opacity", linesOp); }
-  const hot = encPulse > 0 && f > 0.55 ? encPulse : (encAct ? Math.sin(Math.PI * clamp01(encAct.arr - Math.floor(encAct.arr))) * (encAct.arr < 6 ? 1 : 0) : 0);
+  const hot = encPulse > 0 ? encPulse : (encAct ? Math.sin(Math.PI * clamp01(encAct.arr - Math.floor(encAct.arr))) * (encAct.arr < 6 ? 1 : 0) : 0);
   const hotJ = encAct ? Math.min(nTok - 1, Math.floor(encAct.arr)) : nTok - 1;
   if (hot > 0 && hotJ >= 0) for (let k = 0; k < nTok; k++) { inEnc.append("line").attr("x1", TOKX + 6).attr("y1", tokY(hotJ)).attr("x2", L1X - 4).attr("y2", nodeY(k)).attr("stroke", ACT).attr("stroke-width", 1).attr("stroke-opacity", 0.7 * hot);
     inEnc.append("line").attr("x1", L1X + 4).attr("y1", nodeY(k)).attr("x2", L2X - 4).attr("y2", nodeY(k)).attr("stroke", ACT).attr("stroke-width", 0.8).attr("stroke-opacity", 0.4 * hot); }
@@ -299,9 +305,9 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   arrowTo(inEnc, L2X + 12, ST.encW - 10, (topY + botY) / 2, 0.8);
   if (encAct) [L1X, L2X].forEach((x, li) => { const on = Math.sin(Math.PI * clamp01(encAct.lp * 2 - li)); if (on > 0) inEnc.append("rect").attr("x", x - 9).attr("y", topY - 10).attr("width", 18).attr("height", botY - topY + 20).attr("rx", 9).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", on); });
   // -- pool: the layer-2 outputs average into one 128-d column, z
-  const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`);
+  const inPool = g.append("g").attr("transform", `translate(${ST.poolX},${ST.y})`).attr("clip-path", "url(#clip-inPool)");
   const poolAct = shot === "pool" && anim != null ? { merge: ease(sub(anim, 0, 0.45)), drop: ease(sub(anim, 0.55, 1)) } : null;
-  const zTop = 36 + (catH - shortH) / 2;
+  const zTop = 48 + (catH - shortH) / 2;
   if (poolAct) for (let j = 0; j < nTok; j++) { const x0 = ST.encX + L2X, x1 = ST.poolX + ST.poolW / 2, y0 = ST.y + nodeY(j), y1 = ST.y + zTop + shortH / 2;
     g.append("circle").attr("cx", lerp(x0, x1, poolAct.merge)).attr("cy", lerp(y0, y1, poolAct.merge)).attr("r", 3.5).attr("fill", "#fff").attr("stroke", INK).attr("opacity", 0.9 * (1 - poolAct.merge)); }
   vcol(inPool, ST.poolW / 2, zTop, SHORT.n, SHORT.cw, SHORT.ch, "ao", (rid ?? 0) * 7 + 99, poolAct ? poolAct.merge : (nTokReal > 0 || shot === "over" ? 1 : 0.35), false, SHORT.n, SHORT.gap);
@@ -311,7 +317,7 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   if (poolAct) g.append("circle").attr("cx", ST.zX).attr("cy", YC).attr("r", 10 + 4 * Math.sin(Math.PI * sub(anim, 0.45, 0.6))).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("opacity", Math.sin(Math.PI * sub(anim, 0.45, 0.6)));
   // ---- the current tuple travelling between stages (flow shot, beat 6)
   if (mode !== "many" && prog > 0 && prog < steps) {
-    const f1 = sub(f, 0, 0.25), f3 = sub(f, 0.55, 0.78);
+    const f1 = sub(f, 0, 0.25), f3 = sub(f, 0.55, 0.74);
     if (f1 < 1) pair(g, lerp(slot(t), ST.embX + 24, ease(f1)), YC, ic[t], oc[t], 4 + f1, 1);
     if (f >= 0.55 && f3 < 1) { const e3 = ease(f3), x = lerp(ST.prjX + 92, ST.encX + TOKX, e3), yT = lerp(ST.y + shortTop, ST.y + tokY(Math.min(nTok - 1, t)) - tokN * (tokCh + 0.3) / 2, e3);
       vcol(g, x, yT, SHORT.n, lerp(SHORT.cw, tokCw, e3), lerp(SHORT.ch, tokCh, e3), "ao", seed, 1, true, SHORT.n, lerp(SHORT.gap, 0.3, e3)); }
@@ -320,10 +326,13 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   const L = g.append("g");
   if (mode === "one") {
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.35, 0.97)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.78, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", hue).attr("stroke-width", 1).attr("opacity", 0.9);
+        L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", hue).text(k + 1); });
+      if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);
       L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
       const labelled = shot === "flow" ? sub(sq, 0.92, 0.98) : 0, pass = S.pass.get(rid);
-      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
+      L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 8 + 3 * (prog < steps ? Math.sin(Math.PI * sub(f, 0.78, 1)) : 0)).attr("fill", d3.interpolateRgb(hue, pass ? PASS : FAIL)(labelled)).attr("stroke", "#fff").attr("stroke-width", 2);
       if (labelled > 0) icon(L, pass ? "circle-check" : "circle-x", cur[0] + 16, cur[1] - 12, 16, pass ? PASS : FAIL, labelled);
       g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`rollout 1 · step ${seen} of ${steps}`); }
   } else if (mode === "many") {
@@ -345,7 +354,10 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
   } else {
     drawPrototypes(L, S, 1, true);
     if (seen > 0) { const tr = S.trails.get(rid), tz = Math.max(0, seen - 1), from = tr[Math.max(0, tz - 1)], to = tr[Math.min(tr.length - 1, tz)];
-      const mv = prog >= steps ? 1 : ease(sub(f, 0.35, 0.97)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      const mv = prog >= steps ? 1 : ease(sub(f, 0.78, 1)), cur = [lerp(from[0], to[0], seen > 1 ? mv : 1), lerp(from[1], to[1], seen > 1 ? mv : 1)];
+      tr.slice(0, Math.max(0, seen - 1)).forEach((pt, k) => { L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 4.5).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 1).attr("opacity", 0.9);
+        L.append("text").attr("x", pt[0]).attr("y", pt[1] + 2).attr("text-anchor", "middle").attr("font-size", 5.5).attr("fill", INK).text(k + 1); });
+      if (seen > 0) L.append("text").attr("x", cur[0]).attr("y", cur[1] - 14).attr("text-anchor", "middle").attr("font-size", 8).attr("font-weight", 700).attr("fill", INK).text(`after step ${seen}`);
       L.append("path").attr("d", d3.line().curve(d3.curveCatmullRom)(tr.slice(0, Math.max(1, seen)).concat([cur]))).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.5).attr("stroke-opacity", 0.6);
       [[S.protoP, PASS], [S.protoF, FAIL]].forEach(([pt, col]) => L.append("line").attr("x1", cur[0]).attr("y1", cur[1]).attr("x2", pt[0]).attr("y2", pt[1]).attr("stroke", col).attr("stroke-width", 1.2).attr("stroke-dasharray", "3,3"));
       L.append("circle").attr("cx", cur[0]).attr("cy", cur[1]).attr("r", 10).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2.5); icon(L, "bot", cur[0], cur[1], 12, INK);

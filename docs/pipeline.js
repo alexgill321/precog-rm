@@ -338,20 +338,38 @@ function drawModel(gRoot, S, bi, q, fadeIn) {
       if (labelled > 0) icon(L, pass ? "circle-check" : "circle-x", cur[0] + 16, cur[1] - 12, 16, pass ? PASS : FAIL, labelled);
       g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`rollout 1 · step ${seen} of ${steps}`); }
   } else if (mode === "many") {
+    // the sixteen labeled rollouts, listed on the left and fed through one by one
     const others = S.trains.slice(1), per = 0.55 / others.length, label = ease(sub(q, 0.6, 0.72)), proto = ease(sub(q, 0.76, 1));
+    const rowY = (i) => ST.y + 9 + i * 9.4, rowX = ST.qX, rowW = 118;
+    const miniStrip = (gg, x, y, r, op) => { const n = Math.min(7, r.n_steps); for (let k = 0; k < n; k++) { gg.append("rect").attr("x", x + k * 5.4).attr("y", y - 3.2).attr("width", 3.8).attr("height", 2.8).attr("fill", d3.hsl(SCHEME.a, 0.6, 0.45 + 0.3 * hash(r.rid, k, 1)).formatHex()).attr("opacity", op);
+      gg.append("rect").attr("x", x + k * 5.4).attr("y", y + 0.4).attr("width", 3.8).attr("height", 2.8).attr("fill", d3.hsl(SCHEME.o, 0.6, 0.45 + 0.3 * hash(r.rid, k, 2)).formatHex()).attr("opacity", op); } };
+    let flowing = null, nDone = 1;
+    S.trains.forEach((r, i) => {
+      const y = rowY(i), h = i === 0 ? null : hueOf(i), pass = S.pass.get(r.rid);
+      const fI = i === 0 ? 1 : sub(q, 0.02 + (i - 1) * per, 0.02 + i * per);
+      const done = fI >= 1, active = fI > 0 && fI < 1;
+      if (done && i > 0) nDone++;
+      if (active) { flowing = { r, fI, h, y }; g.append("rect").attr("x", rowX - 3).attr("y", y - 4.5).attr("width", rowW + 6).attr("height", 9).attr("rx", 4).attr("fill", ACT_BG); }
+      g.append("circle").attr("cx", rowX + 3).attr("cy", y).attr("r", 2.8).attr("fill", i === 0 ? (S.pass.get(r.rid) ? PASS : FAIL) : done ? d3.interpolateRgb(h, pass ? PASS : FAIL)(clamp01(label * 1.4 - (i - 1) * 0.025)) : h).attr("opacity", done || active ? 1 : 0.45);
+      miniStrip(g, rowX + 9, y, r, active ? 1 - fI : done ? 0.9 : 0.4);
+      const li = i === 0 ? 1 : clamp01(label * 1.4 - (i - 1) * 0.025);
+      if (li > 0 && (done || i === 0)) icon(g, pass ? "circle-check" : "circle-x", rowX + rowW - 4, y, 6.5, pass ? PASS : FAIL, li);
+    });
+    g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${nDone} of ${S.trains.length} labeled rollouts encoded`);
+    // the active rollout: its strip slides into the embedder, its vector flows to the encoder, its point lands
+    if (flowing) { const { r, fI, h, y } = flowing;
+      const slide = ease(sub(fI, 0, 0.3)); if (slide < 1) miniStrip(g, lerp(rowX + 9, ST.embX + 20, slide), lerp(y, YC, slide), r, 1);
+      const x = lerp(ST.embX + 115, ST.encX + 30, ease(sub(fI, 0.3, 0.8))); vcol(g, x, ST.y + 48 + (catH - shortH) / 2, SHORT.n, SHORT.cw, SHORT.ch, "ao", r.rid * 7, 1, true, SHORT.n, SHORT.gap);
+      const nT = Math.min(12, r.n_steps), ty_ = (j) => 54 + j * Math.min(11, (ST.h - 80) / Math.max(1, nT - 1));
+      for (let j = 0; j < Math.floor(nT * sub(fI, 0.3, 0.85)); j++) vcol(inEnc, 30, ty_(j) - 4, 4, 7, 1.7, "ao", r.rid * 7 + j * 3, 1, true, 4, 0.3);
+      inPool.append("rect").attr("x", ST.poolW / 2 - SHORT.cw / 2 - 2).attr("y", zTop - 2).attr("width", SHORT.cw + 4).attr("height", shortH + 3).attr("rx", 2).attr("fill", "none").attr("stroke", h).attr("stroke-width", 1.4); }
+    // points in the latent panel
     const p0 = S.latent.get(focus.rid);
     L.append("circle").attr("cx", p0[0]).attr("cy", p0[1]).attr("r", 6.5).attr("fill", S.pass.get(focus.rid) ? PASS : FAIL).attr("stroke", "#fff").attr("stroke-width", 1.5);
-    let flowing = null;
     others.forEach((r, i) => { const fI = sub(q, 0.02 + i * per, 0.02 + (i + 1) * per); if (fI <= 0) return;
-      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid), h = hueOf(hueIdx.get(r.rid));
-      if (fI < 1) { flowing = { r, fI, h }; L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5 * ease(fI)).attr("fill", h).attr("stroke", "#fff").attr("stroke-width", 1.5); }
+      const pt = S.latent.get(r.rid), pass = S.pass.get(r.rid), h = hueOf(i + 1);
+      if (fI < 1) { const land = ease(sub(fI, 0.75, 1)); if (land > 0) { const from = [ST.zX, YC + 12]; L.append("circle").attr("cx", lerp(from[0], pt[0], land)).attr("cy", lerp(from[1], pt[1], land)).attr("r", 6.5).attr("fill", h).attr("stroke", "#fff").attr("stroke-width", 1.5); } }
       else { const li = clamp01(label * 1.4 - i * 0.025); L.append("circle").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 6.5).attr("fill", d3.interpolateRgb(h, pass ? PASS : FAIL)(li)).attr("stroke", "#fff").attr("stroke-width", 1.5); } });
-    if (flowing) { const { r, fI, h } = flowing, icr = S.icons.get(r.rid), ocr = S.obs.get(r.rid);
-      for (let k = 0; k < Math.min(11, r.n_steps); k++) pair(g, slot(k), YC, icr[k], ocr[k], 4, 0.9 * (1 - fI));
-      const x = lerp(ST.embX + 115, ST.encX + 30, ease(fI)); vcol(g, x, ST.y + 36 + (catH - shortH) / 2, SHORT.n, SHORT.cw, SHORT.ch, "ao", r.rid * 7, 1, true, SHORT.n, SHORT.gap);
-      const nT = Math.min(12, r.n_steps), ty_ = (j) => 54 + j * Math.min(11, (ST.h - 80) / Math.max(1, nT - 1));
-      for (let j = 0; j < nT; j++) vcol(inEnc, 30, ty_(j) - 4, 4, 7, 1.7, "ao", r.rid * 7 + j * 3, fI, true, 4, 0.3); }
-    g.append("text").attr("x", ST.qX).attr("y", ST.y + ST.h + 16).attr("font-size", 9).attr("fill", MUTED).text(`${Math.min(others.length, Math.floor(sub(q, 0.02, 0.57) * others.length)) + 1} of ${S.trains.length} labeled rollouts`);
     if (proto > 0) drawPrototypes(L, S, proto, false);
   } else {
     drawPrototypes(L, S, 1, true);

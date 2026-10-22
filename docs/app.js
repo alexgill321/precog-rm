@@ -12,7 +12,8 @@ const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
 const fmt = d3.format(".2f"), fmt3 = d3.format(".3f");
 
 let INDEX = null, B = null;                      // index, current bundle
-let flowState = { steps: 30, collapse: false, cluster: null, hoverRid: null };
+let MB = null, mapSel = null, mapFollowsPage = true;   // the state-map panel's own bundle and selected state
+const mapCache = new Map();
 let S = { encoder: "prefix", preset: "cv0", support: new Set(), sel: null, t: 1 };
 
 // ---------- loading ----------
@@ -24,6 +25,7 @@ async function init() {
   $("#sel-policy").onchange = () => { refreshTasks(); loadSelected(); };
   $("#sel-task").onchange = loadSelected;
   refreshPolicies();
+  initMapSelectors();
   const q = new URLSearchParams(location.search);
   if (q.get("task")) {
     const t = INDEX.tasks.find(x => x.task === q.get("task"));
@@ -57,112 +59,64 @@ async function loadSelected() {
   ].join("");
   const setN = (id, items) => { const el = $(id); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
   setN("#n1", [[B.n_rollouts, "rollouts of " + B.task_id], [B.clusters.length, "behavior states (incl. outlier bin)"], [`${Math.round(B.success_rate * 100)}%`, "success rate"], [maxT, "longest rollout, in steps"]]);
-  $("#flow-steps").max = maxT; $("#flow-steps").value = Math.min(30, maxT); flowState.steps = +$("#flow-steps").value; $("#flow-steps-val").textContent = flowState.steps;
-  flowState.cluster = null; $("#cluster-panel").innerHTML = `<p class="muted">Click a bar to inspect a behavior state.</p>`;
   const ENC_LABEL = { prefix: "Precog-RM, prefix-trained (deployed in GRPO)", full: "Precog-RM, generalist, full rollouts only", raw: "raw action–observation space, no learning (nearest centroid)" };
   const encSel = $("#sel-encoder"); encSel.innerHTML = ""; ["prefix", "full", "raw"].filter(k => B.encoders[k]).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = ENC_LABEL[k]; encSel.appendChild(o); });
   if (!B.encoders[S.encoder]) S.encoder = Object.keys(B.encoders)[0]; encSel.value = S.encoder;
   S.thr = B.stop_threshold; $("#theta").value = S.thr; $("#theta-val").textContent = S.thr.toFixed(2);
   S.sel = null; applyPreset();
-  drawFlow(); drawScoring();
+  drawScoring();
   window.PRECOG_BUNDLE = B;
   document.dispatchEvent(new CustomEvent("precog:bundle", { detail: B }));
+  if (mapFollowsPage) { setMapTo(B.benchmark, B.policy, B.task); loadMap(); }
 }
-$("#flow-steps").oninput = (e) => { flowState.steps = +e.target.value; $("#flow-steps-val").textContent = flowState.steps; drawFlow(); };
-$("#flow-collapse").onchange = (e) => { flowState.collapse = e.target.checked; drawFlow(); };
 $("#sel-encoder").onchange = (e) => { S.encoder = e.target.value; drawScoring(); };
 $("#sel-support").onchange = (e) => { S.preset = e.target.value; applyPreset(); drawScoring(); };
 $("#prefix-t").oninput = (e) => { S.t = +e.target.value; drawScoring(false); };
 if ($("#theta")) $("#theta").oninput = (e) => { S.thr = +e.target.value; $("#theta-val").textContent = S.thr.toFixed(2); drawScoring(false); };
 document.addEventListener("precog:k", (e) => { S.preset = `k${e.detail}`; $("#sel-support").value = S.preset; applyPreset(); drawScoring(); });
-window.addEventListener("resize", () => { if (B) { drawFlow(); drawScoring(false); } });
+window.addEventListener("resize", () => { if (B) drawScoring(false); });
 
-// ---------- 1. behavior-state flow ----------
-function drawFlow() {
-  const svg = d3.select("#flow"); svg.selectAll("*").remove();
-  const W = svg.node().clientWidth || 700, H = svg.node().clientHeight || 520;
-  const m = { l: 36, r: 12, t: 10, b: 34 };
-  const rolls = B.rollouts, byRid = new Map(rolls.map(r => [r.rid, r]));
-  const pass = new Map(rolls.map(r => [r.rid, r.reward >= 0.5]));
-  let steps = d3.range(0, flowState.steps);
-  // per step: cluster -> rids
-  const occ = steps.map(t => { const g = new Map(); rolls.forEach(r => { if (t < r.n_steps) { const c = r.steps[t].c; if (!g.has(c)) g.set(c, []); g.get(c).push(r.rid); } }); return g; });
-  if (flowState.collapse) { // drop a step when it has one state identical to the previous step's single state
-    const keep = steps.filter((t, i) => i === 0 || !(occ[i].size === 1 && occ[i - 1].size === 1 && [...occ[i].keys()][0] === [...occ[i - 1].keys()][0]));
-    if (keep[keep.length - 1] !== steps[steps.length - 1]) keep.push(steps[steps.length - 1]);
-    steps = keep;
-  }
-  const occS = steps.map(t => occ[t]);
-  const sr = new Map(B.clusters.map(c => [c.id, c.sr])), noise = new Map(B.clusters.map(c => [c.id, c.noise]));
-  const n = rolls.length, gap = 3;
-  const x = d3.scalePoint().domain(steps).range([m.l, W - m.r]).padding(0.5);
-  const bw = Math.max(6, Math.min(18, (W - m.l - m.r) / steps.length * 0.45));
-  const maxBars = d3.max(occS, g => g.size);
-  const unit = (H - m.t - m.b - gap * (maxBars - 1)) / n;      // px per rollout
-  // layout: bars per step, ordered by success rate (success at top), rid slots within bars
-  const pos = new Map();   // key `${t}:${rid}` -> y
-  const bars = [];
-  steps.forEach((t, i) => {
-    const g = occS[i];
-    const order = [...g.keys()].sort((a, b) => (sr.get(b) - sr.get(a)) || (a - b));
-    const total = d3.sum(order, c => g.get(c).length) * unit + gap * (order.length - 1);
-    let y = m.t + (H - m.t - m.b - total) / 2;
-    order.forEach(c => {
-      let rids = g.get(c);
-      if (i > 0) rids = rids.slice().sort((a, b) => (pos.get(`${steps[i - 1]}:${a}`) ?? 1e9) - (pos.get(`${steps[i - 1]}:${b}`) ?? 1e9) || a - b);
-      const h = rids.length * unit;
-      bars.push({ t, c, y0: y, h, n: rids.length, rids });
-      rids.forEach((rid, k) => pos.set(`${t}:${rid}`, y + (k + 0.5) * unit));
-      y += h + gap;
-    });
-  });
-  // ribbons
-  const rib = svg.append("g").attr("class", "ribbons");
-  const paths = [];
-  rolls.forEach(r => {
-    for (let i = 0; i + 1 < steps.length; i++) {
-      const a = pos.get(`${steps[i]}:${r.rid}`), b = pos.get(`${steps[i + 1]}:${r.rid}`);
-      if (a == null || b == null) continue;
-      const x0 = x(steps[i]) + bw / 2, x1 = x(steps[i + 1]) - bw / 2, cx = (x0 + x1) / 2;
-      paths.push({ rid: r.rid, d: `M${x0},${a}C${cx},${a} ${cx},${b} ${x1},${b}` });
-    }
-  });
-  rib.selectAll("path").data(paths).join("path").attr("d", d => d.d).attr("fill", "none")
-    .attr("stroke", d => pass.get(d.rid) ? PASS : FAIL).attr("stroke-width", 1.3).attr("stroke-opacity", 0.32)
-    .attr("class", d => `rid-${d.rid}`)
-    .on("mouseenter", (e, d) => highlightRid(d.rid)).on("mouseleave", () => highlightRid(null))
-    .on("click", (e, d) => selectRollout(d.rid));
-  // bars
-  svg.append("g").selectAll("rect").data(bars).join("rect")
-    .attr("x", d => x(d.t) - bw / 2).attr("y", d => d.y0).attr("width", bw).attr("height", d => Math.max(1, d.h))
-    .attr("fill", d => noise.get(d.c) ? NOISE : srColor(sr.get(d.c)))
-    .attr("stroke", d => d.c === flowState.cluster ? "#000" : (noise.get(d.c) ? NOISE_STROKE : "#fff"))
-    .attr("stroke-width", d => d.c === flowState.cluster ? 2 : (noise.get(d.c) ? 1.5 : 0.6))
-    .style("cursor", "pointer")
-    .on("click", (e, d) => showCluster(d.c, d.t))
-    .append("title").text(d => `step ${d.t + 1} · state ${d.c}${noise.get(d.c) ? " (outlier bin)" : ""} · ${d.n} rollouts · state success rate ${fmt(sr.get(d.c))}`);
-  // axis
-  svg.append("g").attr("transform", `translate(0,${H - m.b + 6})`).call(d3.axisBottom(x).tickFormat(t => t + 1).tickValues(steps.filter((t, i) => steps.length <= 32 || i % 2 === 0)))
-    .call(g => g.select(".domain").remove()).selectAll("text").style("font-size", "11px");
-  svg.append("text").attr("x", W - m.r).attr("y", H - 2).attr("text-anchor", "end").attr("font-size", 11).attr("fill", "#6b6b6b").text("rollout step →");
-  function highlightRid(rid) {
-    flowState.hoverRid = rid;
-    rib.selectAll("path").attr("stroke-opacity", d => rid == null ? 0.32 : (d.rid === rid ? 0.95 : 0.06)).attr("stroke-width", d => rid != null && d.rid === rid ? 2.6 : 1.3);
-    if (rid != null) rib.selectAll(`.rid-${rid}`).raise();
-  }
+// ---------- 1. the state map of one task (act 3's "look inside"): its own benchmark / policy / task selection ----------
+const BENCH_L = { tau2: "Tau2-Bench", bfclv3: "BFCLv3", agentclinic: "AgentClinic" };
+function initMapSelectors() {
+  if (!$("#map-benchmark")) return;
+  const bms = [...new Set(INDEX.tasks.map(t => t.benchmark))];
+  fill($("#map-benchmark"), bms, bms.map(b => BENCH_L[b] || b));
+  $("#map-benchmark").onchange = () => { mapFollowsPage = false; mapPolicies(); loadMap(); };
+  $("#map-policy").onchange = () => { mapFollowsPage = false; mapTasks(); loadMap(); };
+  $("#map-task").onchange = () => { mapFollowsPage = false; loadMap(); };
+  mapPolicies();
 }
-function showCluster(c, t) {
-  flowState.cluster = c; drawFlow();
-  const cl = B.clusters.find(x => x.id === c);
-  const members = [];
-  B.rollouts.forEach(r => r.steps.forEach((s, i) => { if (s.c === c) members.push({ rid: r.rid, t: i, pass: r.reward >= 0.5, s }); }));
-  const atStep = members.filter(mm => mm.t === t), rest = members.filter(mm => mm.t !== t);
-  const med = cl.medoid;
+function mapPolicies() { const bm = $("#map-benchmark").value; fill($("#map-policy"), [...new Set(INDEX.tasks.filter(t => t.benchmark === bm).map(t => t.policy))]); mapTasks(); }
+function mapTasks() { const bm = $("#map-benchmark").value, pol = $("#map-policy").value, ts = INDEX.tasks.filter(t => t.benchmark === bm && t.policy === pol);
+  fill($("#map-task"), ts.map(t => t.task), ts.map(t => `${t.task_id}  (success ${Math.round(t.success_rate * 100)}%)`)); }
+function setMapTo(bm, pol, task) { if (!$("#map-benchmark")) return; $("#map-benchmark").value = bm; mapPolicies(); $("#map-policy").value = pol; mapTasks(); $("#map-task").value = task; }
+async function loadMap() {
+  if (!$("#map")) return;
+  const bm = $("#map-benchmark").value, pol = $("#map-policy").value, task = $("#map-task").value; if (!task) return;
+  const key = `${bm}/${pol}/${task}`;
+  if (B && `${B.benchmark}/${B.policy}/${B.task}` === key) mapCache.set(key, Promise.resolve(B));
+  if (!mapCache.has(key)) mapCache.set(key, fetch(`${DATA_BASE}/${key}.json?v=${DATA_V}`).then(r => r.json()));
+  $("#map-badges").innerHTML = `<span class="badge">loading ${task}…</span>`;
+  MB = await mapCache.get(key); mapSel = null;
+  const maxT = d3.max(MB.rollouts, r => r.n_steps);
+  $("#map-badges").innerHTML = [`<span class="badge">${MB.task_id}</span>`, `<span class="badge">${MB.n_rollouts} rollouts</span>`, `<span class="badge">success rate ${Math.round(MB.success_rate * 100)}%</span>`,
+    `<span class="badge">${MB.clusters.filter(c => !c.noise).length} states</span>`, `<span class="badge">up to ${maxT} steps</span>`].join("");
+  $("#cluster-panel").innerHTML = `<p class="muted">Hover a state to see where rollouts go from it; click it to read the steps it merges.</p>`;
+  drawMap();
+}
+function drawMap() { if (!MB || !window.PrecogOpening || !window.PrecogOpening.mapPanel) return;
+  window.PrecogOpening.mapPanel($("#map"), MB, { selected: mapSel, onSelect: (c) => { mapSel = mapSel === c ? null : c; drawMap(); showState(mapSel); } }); }
+function showState(c) {
+  if (c == null) { $("#cluster-panel").innerHTML = `<p class="muted">Hover a state to see where rollouts go from it; click it to read the steps it merges.</p>`; return; }
+  const cl = MB.clusters.find(x => x.id === c), members = [];
+  MB.rollouts.forEach(r => r.steps.forEach((s, i) => { if (s.c === c) members.push({ rid: r.rid, t: i, pass: r.reward >= 0.5, s }); }));
+  members.sort((a, b) => a.t - b.t || a.rid - b.rid);
+  const ts = members.map(m => m.t), shown = 40, med = cl.medoid || [];
   const card = (mm) => `<div class="pair ${mm.pass ? "pass" : "fail"}"><div class="who">rollout ${mm.rid}, step ${mm.t + 1}${mm.rid === med[0] && mm.t === med[1] ? " · medoid" : ""}</div><div class="a">${esc(mm.s.a)}</div><div class="o">${esc(mm.s.o)}</div></div>`;
-  $("#cluster-panel").innerHTML = `<h3>State ${c}${cl.noise ? " · outlier bin" : ""}</h3>
-    <p class="muted small-text">${cl.n} steps from ${cl.n_rollouts} rollouts · success rate of rollouts passing through: ${fmt(cl.sr)}</p>
-    <h3>At step ${t + 1} (${atStep.length})</h3>${atStep.map(card).join("")}
-    ${rest.length ? `<details><summary>Other steps in this state (${rest.length})</summary>${rest.slice(0, 60).map(card).join("")}${rest.length > 60 ? `<p class="muted">… ${rest.length - 60} more</p>` : ""}</details>` : ""}`;
+  $("#cluster-panel").innerHTML = `<h3>State ${c}${cl.noise ? " · unclustered steps" : ""}</h3>
+    <p class="muted small-text">${cl.n} steps from ${cl.n_rollouts} rollouts, at steps ${d3.min(ts) + 1} to ${d3.max(ts) + 1} · ${Math.round(cl.sr * cl.n_rollouts)} of those ${cl.n_rollouts} rollouts succeed</p>
+    ${members.slice(0, shown).map(card).join("")}${members.length > shown ? `<p class="muted">… ${members.length - shown} more</p>` : ""}`;
 }
 const esc = (s) => s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
 

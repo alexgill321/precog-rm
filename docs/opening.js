@@ -19,6 +19,35 @@ const outcome = (g, x, y, pass, size = 16, op = 1) => icon(g, pass ? "circle-che
 const bot = (g, x, y, r = 11) => { const s = g.append("g").attr("transform", `translate(${x},${y})`); s.append("circle").attr("r", r).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2); icon(s, "bot", 0, 0, r * 1.15, INK); return s; };
 
 let B = null, D = null;
+// The global state graph over whole rollouts, for act 2's map, act 3, and the state-map panel (any task's bundle).
+function buildGraph(rolls, pass, noise) {
+  // the global state graph over whole rollouts. Clusters are formed over all steps of all rollouts, so one state
+  // can occur at different step indices and the graph can loop. Nodes sit left to right by the mean step at which they
+  // occur; the outlier bin (steps no cluster claims) sits apart at the bottom. Success rates count rollouts, not visits.
+  const L = d3.max(rolls, r => r.n_steps), gstat = new Map(), gedges = new Map();
+  rolls.forEach(r => { const p = pass(r), seenC = new Set(), seenE = new Set();
+    for (let t = 0; t < r.n_steps; t++) { const c = r.steps[t].c; if (!gstat.has(c)) gstat.set(c, { c, n: 0, nr: 0, np: 0, ts: 0 }); const g0 = gstat.get(c); g0.n++; g0.ts += t;
+      if (!seenC.has(c)) { seenC.add(c); g0.nr++; if (p) g0.np++; }
+      if (t + 1 < r.n_steps) { const b = r.steps[t + 1].c, k = `${c}>${b}`; if (!gedges.has(k)) gedges.set(k, { a: c, b, n: 0, nr: 0, np: 0 }); const e = gedges.get(k); e.n++;
+        if (!seenE.has(k)) { seenE.add(k); e.nr++; if (p) e.np++; } } } });
+  gedges.forEach(e => { e.sr = e.np / e.nr; });
+  const gnodes = [...gstat.values()].map(g0 => ({ ...g0, meanT: g0.ts / g0.n, sr: g0.np / g0.nr, r: 3.5 + Math.sqrt(g0.n) * 1.1, noise: !!noise.get(g0.c) }));
+  const tMax = d3.max(gnodes, d => d.meanT), gx = d3.scaleLinear().domain([0, Math.max(1, tMax)]).range([70, 830]), CY = 222, NY = 396;
+  // the trunk (states most rollouts visit) runs through the middle; rarer states sit further above or below it
+  const nR = rolls.length, side = (nd) => (hash(nd.c, 1, 7) < 0.5 ? -1 : 1), yT = (nd) => nd.noise ? NY : CY + side(nd) * (1 - nd.nr / nR) * 130;
+  gnodes.forEach(nd => { nd.x = gx(nd.meanT); nd.y = yT(nd); });
+  const links = [...gedges.values()].filter(e => e.a !== e.b && !noise.get(e.a) && !noise.get(e.b)).map(e => ({ source: e.a, target: e.b, n: e.nr }));
+  const sim = d3.forceSimulation(gnodes)
+    .force("x", d3.forceX(d => gx(d.meanT)).strength(0.9))
+    .force("y", d3.forceY(yT).strength(d => d.noise ? 1 : 0.12))
+    .force("link", d3.forceLink(links).id(d => d.c).distance(50).strength(l => 0.01 + 0.01 * Math.sqrt(l.n)))
+    .force("collide", d3.forceCollide(d => d.r + 13).iterations(3)).stop();
+  for (let i = 0; i < 400; i++) sim.tick();
+  gnodes.forEach(nd => { nd.x = Math.max(40, Math.min(860, nd.x)); nd.y = nd.noise ? NY : Math.max(84, Math.min(350, nd.y)); });
+  const gnode = new Map(gnodes.map(nd => [nd.c, nd]));
+  return { L, gnodes, gnode, gedges };
+}
+
 function prep(b) {
   const rolls = b.rollouts, S = 12, sr = new Map(b.clusters.map(c => [c.id, c.sr])), noise = new Map(b.clusters.map(c => [c.id, c.noise]));
   const pass = (r) => r.reward >= 0.5, ic = (r) => r.steps.map(s => [actionIcon(s.a), obsIcon(s.o)]);
@@ -43,30 +72,7 @@ function prep(b) {
   for (let k = best.k; k >= 3 && !prefix; k--) { const sh = rolls.filter(r => r.n_steps > k && d3.range(k).every(t => r.steps[t].c === best.f.steps[t].c));
     if (sh.filter(pass).length >= 2 && sh.filter(r => !pass(r)).length >= 2 && sh.includes(best.p)) prefix = { k, rolls: sh }; }
   if (!prefix) prefix = { k: best.k, rolls: rolls.filter(r => r.n_steps > best.k && d3.range(best.k).every(t => r.steps[t].c === best.f.steps[t].c)) };
-  // act 2: the global state graph over whole rollouts. Clusters are formed over all steps of all rollouts, so one state
-  // can occur at different step indices and the graph can loop. Nodes sit left to right by the mean step at which they
-  // occur; the outlier bin (steps no cluster claims) sits apart at the bottom. Success rates count rollouts, not visits.
-  const L = d3.max(rolls, r => r.n_steps), gstat = new Map(), gedges = new Map();
-  rolls.forEach(r => { const p = pass(r), seenC = new Set(), seenE = new Set();
-    for (let t = 0; t < r.n_steps; t++) { const c = r.steps[t].c; if (!gstat.has(c)) gstat.set(c, { c, n: 0, nr: 0, np: 0, ts: 0 }); const g0 = gstat.get(c); g0.n++; g0.ts += t;
-      if (!seenC.has(c)) { seenC.add(c); g0.nr++; if (p) g0.np++; }
-      if (t + 1 < r.n_steps) { const b = r.steps[t + 1].c, k = `${c}>${b}`; if (!gedges.has(k)) gedges.set(k, { a: c, b, n: 0, nr: 0, np: 0 }); const e = gedges.get(k); e.n++;
-        if (!seenE.has(k)) { seenE.add(k); e.nr++; if (p) e.np++; } } } });
-  gedges.forEach(e => { e.sr = e.np / e.nr; });
-  const gnodes = [...gstat.values()].map(g0 => ({ ...g0, meanT: g0.ts / g0.n, sr: g0.np / g0.nr, r: 3.5 + Math.sqrt(g0.n) * 1.1, noise: !!noise.get(g0.c) }));
-  const tMax = d3.max(gnodes, d => d.meanT), gx = d3.scaleLinear().domain([0, tMax]).range([70, 830]), CY = 222, NY = 396;
-  // the trunk (states most rollouts visit) runs through the middle; rarer states sit further above or below it
-  const nR = rolls.length, side = (nd) => (hash(nd.c, 1, 7) < 0.5 ? -1 : 1), yT = (nd) => nd.noise ? NY : CY + side(nd) * (1 - nd.nr / nR) * 130;
-  gnodes.forEach(nd => { nd.x = gx(nd.meanT); nd.y = yT(nd); });
-  const links = [...gedges.values()].filter(e => e.a !== e.b && !noise.get(e.a) && !noise.get(e.b)).map(e => ({ source: e.a, target: e.b, n: e.nr }));
-  const sim = d3.forceSimulation(gnodes)
-    .force("x", d3.forceX(d => gx(d.meanT)).strength(0.9))
-    .force("y", d3.forceY(yT).strength(d => d.noise ? 1 : 0.12))
-    .force("link", d3.forceLink(links).id(d => d.c).distance(50).strength(l => 0.01 + 0.01 * Math.sqrt(l.n)))
-    .force("collide", d3.forceCollide(d => d.r + 13).iterations(3)).stop();
-  for (let i = 0; i < 400; i++) sim.tick();
-  gnodes.forEach(nd => { nd.x = Math.max(40, Math.min(860, nd.x)); nd.y = nd.noise ? NY : Math.max(84, Math.min(350, nd.y)); });
-  const gnode = new Map(gnodes.map(nd => [nd.c, nd]));
+  const { L, gnodes, gnode, gedges } = buildGraph(rolls, pass, noise);
   // act 2: two steps in the same (non-outlier) state, from different rollouts and preferably different steps, saying the same thing in different words
   const wordsOf = (t) => new Set((t || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(" ").filter(w => w.length > 2));
   let simPair = null;
@@ -233,16 +239,16 @@ function attemptScene(svg, f, opt = {}) {
 // ---------- the state map, shared by acts 2 and 3 ----------
 const NEU = "#b9b9b3", halo = (t) => t.attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke");
 // a transition between two states: forward edges bow alternately up or down, back edges arc over the top, self-loops sit on top of the node
-const gEdgePath = (e) => { const a = D.gnode.get(e.a), b = D.gnode.get(e.b);
+const gEdgePath = (e, G = D) => { const a = G.gnode.get(e.a), b = G.gnode.get(e.b);
   if (e.a === e.b) { const r = a.r; return `M${a.x - r * 0.5},${a.y - r * 0.85} C${a.x - r * 1.4},${a.y - r * 2.5} ${a.x + r * 1.4},${a.y - r * 2.5} ${a.x + r * 0.5},${a.y - r * 0.85}`; }
   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
   const bend = dx >= 0 ? (hash(e.a, e.b, 3) < 0.5 ? 1 : -1) * Math.min(46, 0.14 * len) : Math.min(90, 0.3 * len);
   return `M${a.x},${a.y} Q${(a.x + b.x) / 2 + nx * bend},${(a.y + b.y) / 2 + ny * bend} ${b.x},${b.y}`; };
-const isNoiseE = (e) => D.gnode.get(e.a).noise || D.gnode.get(e.b).noise, edgeW = (nr) => 0.5 + Math.sqrt(nr) * 0.7;
-const drawEdge = (gg, e, col, op, nr = e.nr, w0 = 0) => gg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", col).attr("stroke-width", edgeW(nr) + w0)
-  .attr("stroke-opacity", op * (0.22 + 0.5 * Math.min(1, nr / 20)) * (isNoiseE(e) ? 0.6 : 1)).attr("stroke-dasharray", isNoiseE(e) ? "3,3" : null);
+const isNoiseE = (e, G = D) => G.gnode.get(e.a).noise || G.gnode.get(e.b).noise, edgeW = (nr) => 0.5 + Math.sqrt(nr) * 0.7;
+const drawEdge = (gg, e, col, op, nr = e.nr, w0 = 0, G = D) => gg.append("path").attr("d", gEdgePath(e, G)).attr("fill", "none").attr("stroke", col).attr("stroke-width", edgeW(nr) + w0)
+  .attr("stroke-opacity", op * (0.22 + 0.5 * Math.min(1, nr / 20)) * (isNoiseE(e, G) ? 0.6 : 1)).attr("stroke-dasharray", isNoiseE(e, G) ? "3,3" : null);
 const drawState = (gg, nd, rScale, op, col) => gg.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nd.r * rScale).attr("fill", "#fff").attr("stroke", col).attr("stroke-width", 2.6).attr("stroke-dasharray", nd.noise ? "3,2" : null).attr("opacity", op);
-const noiseLabel = (gg, op) => { const nd = D.gnodes.find(d => d.noise); if (nd && op > 0) halo(gg.append("text").attr("x", nd.x + nd.r + 7).attr("y", nd.y + 4).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op)).text("unclustered steps"); };
+const noiseLabel = (gg, op, G = D) => { const nd = G.gnodes.find(d => d.noise); if (nd && op > 0) halo(gg.append("text").attr("x", nd.x + nd.r + 7).attr("y", nd.y + 4).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op)).text("unclustered steps"); };
 const routeOf = (r) => d3.range(r.n_steps - 1).map(t => ({ a: r.steps[t].c, b: r.steps[t + 1].c }));
 
 function drawBanner(g, opening, op = 1) { const ban = g.append("g").attr("opacity", op);
@@ -480,6 +486,29 @@ function findingScene(svg, f) {
     lgd.append("text").attr("x", lw).attr("y", 20).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text("1.0 · every success ranked above every failure"); }
 }
 
+// ---------- the state-map panel (act 3's "look inside"): any task's global state graph, coloured by outcome ----------
+const graphCache = new WeakMap();
+function graphOf(b) { if (!graphCache.has(b)) graphCache.set(b, buildGraph(b.rollouts, (r) => r.reward >= 0.5, new Map(b.clusters.map(c => [c.id, c.noise])))); return graphCache.get(b); }
+function mapPanel(node, b, opt = {}) {
+  const G = graphOf(b), svg = d3.select(node); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const sel = opt.selected ?? null, eg = svg.append("g"), ng = svg.append("g");
+  const baseOp = (e) => (0.22 + 0.5 * Math.min(1, e.nr / 20)) * (isNoiseE(e, G) ? 0.6 : 1);
+  const edges = [...G.gedges.values()].sort((a, c) => a.nr - c.nr).map(e => drawEdge(eg, e, srColor(e.sr), 1, e.nr, 0, G).datum(e));
+  edges.forEach(p => p.append("title").text((e => `state ${e.a} to state ${e.b} · ${e.nr} rollouts · ${e.np} succeed`)(p.datum())));
+  const nodes = G.gnodes.map(nd => { const c = drawState(ng, nd, 1, 1, srColor(nd.sr)).datum(nd).attr("stroke-width", nd.c === sel ? 4.5 : 2.6).style("cursor", "pointer");
+    c.append("title").text(`state ${nd.c}${nd.noise ? " · unclustered steps" : ""} · ${nd.n} steps from ${nd.nr} rollouts · ${nd.np} of those rollouts succeed`);
+    c.on("mouseenter", () => focus(nd.c)).on("mouseleave", () => focus(sel)).on("click", () => opt.onSelect && opt.onSelect(nd.c)); return c; });
+  if (sel != null && G.gnode.get(sel)) { const nd = G.gnode.get(sel); ng.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nd.r + 6).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2).style("pointer-events", "none"); }
+  // hovering (or selecting) a state keeps its transitions and neighbours bright and fades the rest
+  function focus(c) { const near = (nd) => c == null || nd.c === c || G.gedges.has(`${c}>${nd.c}`) || G.gedges.has(`${nd.c}>${c}`), on = (e) => c == null || e.a === c || e.b === c;
+    edges.forEach(p => { const e = p.datum(); p.attr("stroke-opacity", Math.min(1, baseOp(e) * (c == null ? 1 : on(e) ? 1.8 : 0.15))); if (c != null && on(e)) p.raise(); });
+    nodes.forEach(n => n.attr("opacity", near(n.datum()) ? 1 : 0.3)); }
+  focus(sel);
+  noiseLabel(svg, 0.9, G);
+  svg.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).text("left to right: the step at which a state tends to occur · size: steps merged into it · colour: share of the rollouts through it that succeed");
+  return G;
+}
+
 // ---------- beats ----------
 const beats = {
   a1(svg, f) { attemptScene(svg, f); },
@@ -590,5 +619,5 @@ function bindText() { const r = D.pairFP.f, gr = r.grader;
 function load(b) { B = b; D = prep(b); bindText(); document.dispatchEvent(new CustomEvent("precog:opening")); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);
-window.PrecogOpening = { draw, get data() { return D; } };
+window.PrecogOpening = { draw, mapPanel, get data() { return D; } };
 })();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
 <meta name="description" content="Precog-RM: an outcome-predictive representation of LLM agent trajectories, told as a story on one task.">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body class="scrolly">
@@ -149,10 +149,11 @@
   <button id="drawer-close">close ✕</button>
   <div class="drawer-panel" data-panel="flow">
     <h3>The state map of one task</h3>
-    <div class="controls small"><label>Steps shown <input id="flow-steps" type="range" min="2" max="30" value="30"> <span id="flow-steps-val">30</span></label><label><input id="flow-collapse" type="checkbox"> collapse uniform steps</label>
-      <span class="legend"><i class="sw pass"></i>pass <i class="sw fail"></i>fail <i class="sw grad"></i>state success rate 0→1 <i class="sw noise"></i>outlier bin</span></div>
-    <div class="split"><div class="grow"><svg id="flow"></svg></div><aside id="cluster-panel" class="panel"><p class="muted">Click a bar to read the action–observation pairs in that state.</p></aside></div>
-    <div class="numbers" id="n1"></div>
+    <div class="controls small"><label>Benchmark <select id="map-benchmark"></select></label><label>Policy <select id="map-policy"></select></label><label>Task <select id="map-task"></select></label>
+      <span class="legend"><i class="sw grad"></i>share of rollouts through a state that succeed, 0 to 1 <i class="sw noise"></i>unclustered steps</span></div>
+    <p id="map-badges" class="badges"></p>
+    <svg id="map"></svg>
+    <div id="cluster-panel" class="panel wide-panel"><p class="muted">Hover a state to see where rollouts go from it; click it to read the steps it merges.</p></div>
   </div>
   <div class="drawer-panel" data-panel="latent">
     <h3>The latent space, your support set</h3>
@@ -185,10 +186,10 @@
 </div>
 
 <script src="icons.js?v=2"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=13"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=26"></script>
+<script src="opening.js?v=27"></script>
 <script src="story.js?v=4"></script>
 <script src="stage.js?v=6"></script>
 </body>

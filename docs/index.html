@@ -125,18 +125,22 @@
     <div class="card"><p class="big">Where text embeddings relate steps by what they say, Precog-RM relates whole rollouts by how they end.</p>
       <button class="inside" data-panel="latent">Look inside: the latent space, your support set</button></div>
   </section>
-  <section class="beat head wide" data-scene="act6" data-f0="0" data-f1="1" data-secs="16" data-hold="3">
-    <div class="card"><p class="act-n">6</p><h2>The proof.</h2>
-<div class="num" data-n="2" data-fmt="int">0</div><p class="numlabel">labeled rollouts per class match the per-task classifiers at eight</p>
-      <div id="fewshot" class="chart"></div>
-      <p>One encoder separates rollouts of policies it never saw; across benchmarks the transfer is partial and recovers once the benchmark joins the pool.</p>
-      <div id="gen-models" class="chart"></div>
-      <p>Trained on prefixes too, it scores a rollout while it runs. Gate on confidence and the prediction becomes a decision.</p>
-      <div id="gating" class="chart"></div>
-      <p class="lands">Two per class. Unseen policies. Mid-rollout.</p>
-      <button class="inside" data-panel="prefix">Look inside: one rollout, step by step</button>
-      <p class="hinge">What is it good for? ↓</p>
-    </div>
+  <section class="beat head" data-scene="a6" data-f0="0" data-f1="0.32" data-secs="9" data-hold="2.5">
+    <div class="card"><p class="act-n">6</p><h2>The proof</h2><p>A variant trained on prefixes scores a rollout while it runs: after each step, the rollout so far becomes a point that drifts toward the prototype it resembles.</p></div>
+  </section>
+  <section class="beat" data-scene="a6" data-f0="0.32" data-f1="0.55" data-secs="6" data-hold="2.5">
+    <div class="card"><p>It needs few labels. With two labeled rollouts per class, it matches what per-task classifiers reach with eight.</p>
+      <div class="num" data-n="2" data-fmt="int">0</div><p class="numlabel">labeled rollouts per class</p></div>
+  </section>
+  <section class="beat" data-scene="a6" data-f0="0.55" data-f1="0.72" data-secs="5" data-hold="2.5">
+    <div class="card"><p>It carries to agents it never trained on, scoring their rollouts nearly as well as those of agents it did.</p></div>
+  </section>
+  <section class="beat" data-scene="a6" data-f0="0.72" data-f1="0.92" data-secs="6" data-hold="2.5">
+    <div class="card"><p>Mid-rollout, it calls an outcome only once it is confident, and holds off when the signal isn’t there.</p></div>
+  </section>
+  <section class="beat" data-scene="a6" data-f0="0.92" data-f1="1.0" data-secs="2" data-hold="4">
+    <div class="card"><p class="big">So many rollouts can be called before they end. During RL training, that is compute that never needs to be spent.</p>
+      <button class="inside" data-panel="prefix">Look inside: one rollout, step by step</button></div>
   </section>
   <section class="beat head wide" data-scene="act7" data-f0="0" data-f1="1" data-secs="11" data-hold="4">
     <div class="card"><p class="act-n">7</p><h2>The payoff.</h2>
@@ -208,8 +212,8 @@
 <script src="app.js?v=16"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=33"></script>
-<script src="opening.js?v=35"></script>
+<script src="opening.js?v=38"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=12"></script>
+<script src="stage.js?v=14"></script>
 </body>
 </html>

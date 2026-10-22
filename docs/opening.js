@@ -568,6 +568,79 @@ function modelScene(svg, f) {
   if (outA4 < 1) obstacleScene(g.append("g").attr("opacity", 1 - outA4), 1);
 }
 
+// ---------- the proof (act 6): a rollout scored as it runs, then the paper's few-shot, transfer and early-stopping results ----------
+function chartAxes(g, X0, X1, Y0, Y1, ys, yTicks) {
+  yTicks.forEach(v => { g.append("line").attr("x1", X0).attr("x2", X1).attr("y1", ys(v)).attr("y2", ys(v)).attr("stroke", "#ecece8");
+    g.append("text").attr("x", X0 - 6).attr("y", ys(v) + 3.5).attr("text-anchor", "end").attr("font-size", 9.5).attr("fill", MUTED).text(v.toFixed(1)); }); }
+function chartTitle(g, x, title, subtitle) { g.append("text").attr("x", x).attr("y", 36).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text(title);
+  g.append("text").attr("x", x).attr("y", 53).attr("font-size", 10.5).attr("fill", MUTED).text(subtitle); }
+function proofScene(svg, f) {
+  const g = svg.append("g"), P = window.PrecogPipeline, S = P && ((D2 && (D2.S || (D2.S = P.buildScene(D2.b)))) || P.scene);
+  const q1 = sub(f, 0, 0.32), q2 = sub(f, 0.32, 0.55), q3 = sub(f, 0.55, 0.72), q4 = sub(f, 0.72, 0.92);
+  // beat 1: the model scene's last part, continuing from act 5: a new rollout re-scored after every step
+  const modelOut = sub(f, 0.32, 0.36);
+  if (S && modelOut < 1) P.renderScene(g.append("g").attr("opacity", 1 - modelOut).append("g").node(), S, 0.78 + 0.22 * q1, false, { noIntro: true });
+  if (!RES) return;
+  // beat 2: Figure 3, Precog-RM against the best per-task classifier at k labeled rollouts per class
+  const fewIn = sub(q2, 0.05, 0.2) * (1 - sub(q3, 0, 0.15));
+  if (fewIn > 0 && RES.fewshot) { const cg = g.append("g").attr("opacity", fewIn), draw = sub(q2, 0.15, 0.6), hl = sub(q2, 0.65, 0.85);
+    chartTitle(cg, 40, "Fewer labels needed", "AUROC on held-out tasks with k labeled rollouts per class · paper, Figure 3");
+    [["#2b5fb3", "Precog-RM", null, 2.5], [MUTED, "best per-task classifier", "4,3", 2.5], [MUTED, "the per-task classifiers' best, at k=8", "1,3", 1.2]].forEach(([c, t, dash, w], i) => { const lx = 620, ly = 22 + i * 15;
+      cg.append("line").attr("x1", lx).attr("x2", lx + 18).attr("y1", ly).attr("y2", ly).attr("stroke", c).attr("stroke-width", w).attr("stroke-dasharray", dash).attr("opacity", i === 2 ? hl : 1);
+      cg.append("text").attr("x", lx + 24).attr("y", ly + 4).attr("font-size", 10.5).attr("fill", c).attr("opacity", i === 2 ? hl : 1).text(t); });
+    FEW_B.forEach(([bn, label], pi) => { const byK = RES.fewshot[bn]; if (!byK) return; const X0 = 80 + pi * 280, X1 = X0 + 210, Y0 = 360, Y1 = 110;
+      const xs = d3.scaleLog().base(2).domain([1, 8]).range([X0, X1]), ys = d3.scaleLinear().domain([0.55, 0.95]).range([Y0, Y1]);
+      cg.append("text").attr("x", (X0 + X1) / 2).attr("y", 92).attr("text-anchor", "middle").attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).text(label);
+      chartAxes(cg, X0, X1, Y0, Y1, ys, [0.6, 0.7, 0.8, 0.9]);
+      FEW_K.forEach(kk => cg.append("text").attr("x", xs(kk)).attr("y", Y0 + 16).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", INK).text(kk));
+      cg.append("text").attr("x", (X0 + X1) / 2).attr("y", Y0 + 32).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("labeled rollouts per class");
+      const best = (kk) => d3.max(["NC", "RBF", "FT1"], m => byK[String(kk)][m]), pn = (kk) => byK[String(kk)].ProtoNet, nShow = 1 + draw * 3;
+      [[best, MUTED, "4,3"], [pn, "#2b5fb3", null]].forEach(([fn, col, dash]) => { const pts = FEW_K.map(kk => [xs(kk), ys(fn(kk))]), whole = Math.floor(nShow), fr = nShow - whole;
+        const shown = pts.slice(0, whole); if (whole < pts.length && fr > 0) shown.push([lerp(pts[whole - 1][0], pts[whole][0], fr), lerp(pts[whole - 1][1], pts[whole][1], fr)]);
+        if (shown.length > 1) cg.append("path").attr("d", d3.line()(shown)).attr("fill", "none").attr("stroke", col).attr("stroke-width", 2.5).attr("stroke-dasharray", dash);
+        pts.slice(0, whole).forEach(([x, y]) => cg.append("circle").attr("cx", x).attr("cy", y).attr("r", 3.5).attr("fill", col)); });
+      if (hl > 0) { const h = cg.append("g").attr("opacity", hl);
+        h.append("line").attr("x1", xs(1)).attr("x2", xs(8)).attr("y1", ys(best(8))).attr("y2", ys(best(8))).attr("stroke", MUTED).attr("stroke-dasharray", "1,3");
+        h.append("circle").attr("cx", xs(2)).attr("cy", ys(pn(2))).attr("r", 9).attr("fill", "none").attr("stroke", "#2b5fb3").attr("stroke-width", 2);
+        h.append("text").attr("x", xs(2) + 12).attr("y", ys(pn(2)) - 10).attr("font-size", 10).attr("fill", "#2b5fb3").attr("font-weight", 700).text(`k=2: ${pn(2).toFixed(2)}`); } }); }
+  // beat 3: Table 2, agents it never trained on
+  const genIn = sub(q3, 0.05, 0.25) * (1 - sub(q4, 0, 0.15));
+  if (genIn > 0 && RES.generalization) { const M = RES.generalization.models, cg = g.append("g").attr("opacity", genIn), grow = ease(sub(q3, 0.2, 0.7));
+    chartTitle(cg, 40, "New agents", "AUROC on held-out tasks, by the agent whose rollouts are scored · paper, Table 2");
+    const ID_ROW = { deepseek: "d", qwen: "q", gpt5mini: "g" }, OOD_ROW = { deepseek: "g+q", qwen: "g+d", gpt5mini: "q+d" }, NAMES = { deepseek: "DeepSeek-V3.2", qwen: "Qwen3-80B", gpt5mini: "GPT-5-mini" };
+    const Y0 = 360, Y1 = 110, ys = d3.scaleLinear().domain([0.5, 0.95]).range([Y0, Y1]); chartAxes(cg, 120, 820, Y0, Y1, ys, [0.5, 0.6, 0.7, 0.8, 0.9]);
+    cg.append("text").attr("x", 114).attr("y", Y0 + 14).attr("text-anchor", "end").attr("font-size", 9.5).attr("fill", MUTED).text("chance");
+    [["#2b5fb3", "trained on this agent's rollouts"], ["#97b0e0", "trained only on the other two agents' rollouts"]].forEach(([c, t], i) => { const lx = 600, ly = 26 + i * 17;
+      cg.append("rect").attr("x", lx).attr("y", ly).attr("width", 12).attr("height", 10).attr("rx", 2).attr("fill", c); cg.append("text").attr("x", lx + 17).attr("y", ly + 9).attr("font-size", 10.5).attr("fill", INK).text(t); });
+    M.cols.forEach((col, j) => { const cx = 230 + j * 230, v1 = M.matrix[M.rows.indexOf(ID_ROW[col])][j], v2 = M.matrix[M.rows.indexOf(OOD_ROW[col])][j];
+      [[v1, "#2b5fb3", -34], [v2, "#97b0e0", 6]].forEach(([v, c, dx]) => { const top = ys(lerp(0.5, v, grow));
+        cg.append("rect").attr("x", cx + dx).attr("y", top).attr("width", 28).attr("height", Y0 - top).attr("rx", 3).attr("fill", c);
+        cg.append("text").attr("x", cx + dx + 14).attr("y", top - 6).attr("text-anchor", "middle").attr("font-size", 10.5).attr("font-weight", 700).attr("fill", INK).attr("opacity", sub(grow, 0.8, 1)).text(v.toFixed(2)); });
+      cg.append("text").attr("x", cx).attr("y", Y0 + 18).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", 700).attr("fill", INK).text(NAMES[col]); }); }
+  // beat 4: Figure 4, calling outcomes mid-rollout only when confident
+  const gateIn = sub(q4, 0.05, 0.25);
+  if (gateIn > 0 && RES.gating) { const cg = g.append("g").attr("opacity", gateIn), drawG = sub(q4, 0.2, 0.75), lab = sub(q4, 0.7, 0.9);
+    chartTitle(cg, 40, "Mid-rollout, only when confident", "accuracy of early calls vs generation steps saved, as the confidence threshold θ is lowered · prefix-trained Precog-RM · paper, Figure 4");
+    const X0 = 120, X1 = 780, Y0 = 360, Y1 = 100, xs = d3.scaleLinear().domain([0, 90]).range([X0, X1]), ys = d3.scaleLinear().domain([0.5, 0.95]).range([Y0, Y1]);
+    chartAxes(cg, X0, X1, Y0, Y1, ys, [0.5, 0.6, 0.7, 0.8, 0.9]);
+    [0, 20, 40, 60, 80].forEach(v => cg.append("text").attr("x", xs(v)).attr("y", Y0 + 16).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", INK).text(`${v}%`));
+    cg.append("text").attr("x", (X0 + X1) / 2).attr("y", Y0 + 32).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("generation steps saved");
+    cg.append("text").attr("x", X0 - 34).attr("y", Y1 - 8).attr("font-size", 10).attr("fill", MUTED).text("accuracy of early calls");
+    FEW_B.forEach(([bn, label, col]) => { const G = RES.gating[bn]; if (!G) return; const idx = G.shown, pts = idx.map(i => [xs(G.steps_saved[i]), ys(G.accuracy[i]), G.thetas[i]]).reverse();   // high θ (few saved) first
+      const nShow = 1 + drawG * (pts.length - 1), whole = Math.floor(nShow), fr = nShow - whole, shown = pts.slice(0, whole);
+      if (whole < pts.length && fr > 0) shown.push([lerp(pts[whole - 1][0], pts[whole][0], fr), lerp(pts[whole - 1][1], pts[whole][1], fr)]);
+      if (shown.length > 1) cg.append("path").attr("d", d3.line()(shown.map(p => [p[0], p[1]]))).attr("fill", "none").attr("stroke", col).attr("stroke-width", 2.5);
+      pts.slice(0, whole).forEach(([x, y, th]) => { cg.append("circle").attr("cx", x).attr("cy", y).attr("r", 3.5).attr("fill", col);
+        if ([0.9, 0.8, 0.7].includes(th) && lab > 0) cg.append("text").attr("x", x + 6).attr("y", y - 6).attr("font-size", 9.5).attr("fill", col).attr("opacity", lab).text(`θ=${th}`); });
+      if (whole >= pts.length) { const [x, y] = pts[pts.length - 1]; cg.append("text").attr("x", x + 8).attr("y", y + 4).attr("font-size", 10.5).attr("font-weight", 700).attr("fill", col).text(label); } });
+    const g8 = (bn) => { const G = RES.gating[bn], i = G.thetas.indexOf(0.8); return Math.round(100 * G.stop_rate[i]); };
+    cg.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", lab)
+      .text(`at θ=0.8 it stops ${g8("tau2")}% of Tau2-Bench and ${g8("bfclv3")}% of BFCLv3 rollouts, but only ${g8("agentclinic")}% on AgentClinic, where its calls are near chance`); }
+  // captions for beats 2 and 3
+  if (fewIn > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", fewIn).text("per-task classifiers: nearest centroid, RBF-SVM and fastText, refit for each task · Precog-RM: one encoder per benchmark, nothing fitted per task");
+  if (genIn > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", genIn).text("tasks and agents both unseen in the second case · unseen benchmarks do not carry over the same way (paper, Appendix J)");
+}
+
 // ---------- the state-map panel (act 3's "look inside"): any task's global state graph, coloured by outcome ----------
 const graphCache = new WeakMap();
 function graphOf(b) { if (!graphCache.has(b)) graphCache.set(b, buildGraph(b.rollouts, (r) => r.reward >= 0.5, new Map(b.clusters.map(c => [c.id, c.noise])))); return graphCache.get(b); }
@@ -598,6 +671,7 @@ const beats = {
   a3(svg, f) { findingScene(svg, f); },
   a4(svg, f) { obstacleScene(svg, f); },
   a5(svg, f) { modelScene(svg, f); },
+  a6(svg, f) { proofScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");

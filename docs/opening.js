@@ -75,8 +75,8 @@ function speech(g, x, y, text, op = 1, color = INK) { const w = text.length * 7.
   b.append("rect").attr("x", x - 6).attr("y", y - 4).attr("width", 12).attr("height", 3).attr("fill", "#fff");
   b.append("text").attr("x", x).attr("y", y - 10).attr("text-anchor", "middle").attr("font-size", 12.5).attr("font-weight", 700).attr("fill", color).text(text); return b; }
 
-function attemptScene(svg, f) {
-  const g = svg.append("g"), r = D.pairFP.f, n = r.n_steps, steps = r.steps, grade = r.grader;
+function attemptScene(svg, f, opt = {}) {
+  const keep = 1 - (opt.endFade || 0), g = svg.append("g"), r = D.pairFP.f, n = r.n_steps, steps = r.steps, grade = r.grader;
   const opening = r.opening || "", fIn = sub(f, 0, 0.008), typed = sub(f, 0.006, 0.052), agentIn = sub(f, 0.05, 0.062), shrink = ease(sub(f, 0.07, 0.11));
   const u = sub(f, 0.11, 0.74), p = n * Math.pow(u, 1.6);
   const doneT = sub(f, 0.75, 0.79), gradT = ease(sub(f, 0.80, 0.83)), scanT = sub(f, 0.83, 0.88), verT = sub(f, 0.88, 0.92), strikeT = ease(sub(f, 0.93, 0.96)), glowT = sub(f, 0.955, 0.99);
@@ -89,7 +89,7 @@ function attemptScene(svg, f) {
   const wFull = sub(cw, 210, 270), wPill = 1 - sub(cw, 64, 96), wMid = Math.max(0, 1 - wFull - wPill);
   // track
   if (p > 0 && wFull < 1) g.append("line").attr("x1", sx(-0.5)).attr("x2", sx(Math.min(p, n) - 0.5)).attr("y1", cy).attr("y2", cy).attr("stroke", "#d6d6d0").attr("stroke-width", Math.max(1.5, k * 0.01)).attr("opacity", 1 - wFull);
-  const glow = glowT > 0 ? g.append("g") : null;
+  const glow = glowT > 0 ? g.append("g").attr("opacity", keep) : null;
   for (let i = 0; i < n; i++) {
     if (i > p) break; const s = clamp01(p - i), aA = sub(s, 0, 0.22), aO = sub(s, 0.42, 0.66);
     const xc = sx(i); if (xc + cw / 2 < -10 || xc - cw / 2 > W + 10) continue;
@@ -125,15 +125,15 @@ function attemptScene(svg, f) {
   const ar = Math.max(8, Math.min(16, k * 0.03));
   let axS = sx(Math.min(p, n) - 0.5), ayS = cy - ch / 2 - ar - 8;
   if (shrink < 1) { axS = lerp(450, axS, shrink); ayS = lerp(268, ayS, shrink); }
-  if (agentIn > 0) { const sp = bot(g, axS, ayS, shrink < 1 ? lerp(18, ar, shrink) : ar); sp.attr("opacity", agentIn);
+  if (agentIn > 0) { const sp = bot(g, axS, ayS, shrink < 1 ? lerp(18, ar, shrink) : ar); sp.attr("opacity", agentIn * keep);
     const sI = clamp01(p - Math.floor(p)), typing = (p > 0 && p < n && sI < 0.25) || (shrink < 1 && f > 0.062);
     if (typing) { const ph = Math.floor(f * 400) % 3; speech(g, axS + 26, ayS - 4, ["·  ", "·· ", "···"][ph], 1, MUTED); } }
   // done!
-  if (doneT > 0) { speech(g, axS, ayS - ar - 4, "Done!", doneT, INK); }
+  if (doneT > 0 && keep > 0) { speech(g, axS, ayS - ar - 4, "Done!", doneT * keep, INK); }
   // the grader
   const tx0 = sx(-0.5), tx1 = sx(n - 0.5);
   if (gradT > 0) {
-    const gg = g.append("g").attr("opacity", gradT * lerp(1, 0.35, strikeT)).attr("transform", `translate(0,${(1 - gradT) * 30})`), gx = 250, gy = 248, gw = 400, gh = 150;
+    const gg = g.append("g").attr("opacity", gradT * lerp(1, 0.35, strikeT) * keep).attr("transform", `translate(0,${(1 - gradT) * 30})`), gx = 250, gy = 248, gw = 400, gh = 150;
     gg.append("rect").attr("x", gx).attr("y", gy).attr("width", gw).attr("height", gh).attr("rx", 12).attr("fill", "#fff").attr("stroke", "#c9c9c3").attr("stroke-width", 1.4);
     icon(gg, "gavel", gx + 28, gy + 28, 26, INK);
     gg.append("text").attr("x", gx + 52).attr("y", gy + 26).attr("font-size", 15).attr("font-weight", 700).attr("fill", INK).text("Grader");
@@ -147,7 +147,7 @@ function attemptScene(svg, f) {
       const res = vg.append("g").attr("transform", `translate(${gx + gw - 118},${gy + 22})`);
       res.append("rect").attr("width", 104).attr("height", 30).attr("rx", 15).attr("fill", D.pass(r) ? PASS : FAIL);
       res.append("text").attr("x", 52).attr("y", 20).attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", 800).attr("fill", "#fff").text(D.pass(r) ? "PASSED" : "FAILED"); }
-    if (strikeT > 0) { const sg = g.append("g").attr("opacity", gradT); const l1 = [[gx - 6, gy - 6], [gx + gw + 6, gy + gh + 6]], l2 = [[gx + gw + 6, gy - 6], [gx - 6, gy + gh + 6]];
+    if (strikeT > 0) { const sg = g.append("g").attr("opacity", gradT * keep); const l1 = [[gx - 6, gy - 6], [gx + gw + 6, gy + gh + 6]], l2 = [[gx + gw + 6, gy - 6], [gx - 6, gy + gh + 6]];
       [l1, l2].forEach(([[x1, y1], [x2, y2]], i) => { const t = clamp01(strikeT * 2 - i); if (t > 0) sg.append("line").attr("x1", x1).attr("y1", y1).attr("x2", lerp(x1, x2, t)).attr("y2", lerp(y1, y2, t)).attr("stroke", INK).attr("stroke-width", 5).attr("stroke-linecap", "round"); });
       sg.append("text").attr("x", gx + gw / 2).attr("y", gy + gh + 26).attr("text-anchor", "middle").attr("font-size", 12.5).attr("font-style", "italic").attr("fill", INK).attr("opacity", strikeT).text("without the grader"); }
   }
@@ -155,14 +155,125 @@ function attemptScene(svg, f) {
   if (scanT > 0 && scanT < 1) g.append("rect").attr("x", lerp(tx0, tx1, scanT) - 14).attr("y", cy - ch / 2 - 10).attr("width", 28).attr("height", ch + 20).attr("rx", 6).attr("fill", ACT).attr("opacity", 0.18);
   if (verT > 0) outcome(g, tx1 + 24, cy, D.pass(r), 18, verT);
   // only the actions and observations remain
-  if (glowT > 0) { const gl = g.append("g").attr("opacity", glowT);
+  if (glowT > 0) { const gl = g.append("g").attr("opacity", glowT * keep);
     gl.append("rect").attr("x", tx0 - 10).attr("y", cy - ch / 2 - 10).attr("width", tx1 - tx0 + 20).attr("height", ch + 20).attr("rx", 10).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2.5);
     gl.append("text").attr("x", tx0 - 6).attr("y", cy + ch / 2 + 28).attr("font-size", 13).attr("font-weight", 700).attr("fill", ACT).text("only the actions and observations"); }
+}
+
+
+// ---------- act 2: from one failed rollout to the map of behavior states ----------
+function drawBanner(g, opening, op = 1) { const ban = g.append("g").attr("opacity", op);
+  ban.append("rect").attr("x", 20).attr("y", 10).attr("width", 860).attr("height", 38).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+  icon(ban, "clipboard-list", 40, 29, 18, INK); ban.append("text").attr("x", 58).attr("y", 33).attr("font-size", 12.5).attr("fill", INK).text(`Task · “${opening.length > 100 ? opening.slice(0, 99) + "…" : opening}”`); }
+function branchScene(svg, f) {
+  const g = svg.append("g"), F = D.pairFP.f, Pr = D.pairFP.p, kB = D.pairFP.k, n = F.n_steps, nP = Pr.n_steps, N = D.rolls.length;
+  const K = 860 / (n + 1), sxT = (i) => 20 + (i + 0.55) * K, cyT = 196, cwT = 0.84 * K, pillT = Math.min(cwT / 1.5, Math.max(26, cwT * 0.6) / 2.9) * 0.92, brY = cyT - 78;
+  const iF = D.rolls.indexOf(F), laneY = (i) => 66 + i * (350 / (N - 1)), LP = 2.3, cap = (r) => Math.min(n, r.n_steps);
+  const icF = D.ic(F), icP = D.ic(Pr), opening = F.opening || "";
+  const route = (r, upto) => d3.range(Math.min(D.S, r.n_steps, upto)).map(t => { const nd = D.node(t, r.steps[t].c); return [nd.x, nd.y]; });
+  const edgePath = (a, b) => `M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`;
+  const nodeR = (nd) => 5 + Math.sqrt(nd.n) * 2.2;
+  const lanePills = (gg, r, y, size, op, upto, tailDim = null) => { const c = cap(r), icons = D.ic(r);
+    gg.append("line").attr("x1", sxT(0)).attr("x2", sxT(c - 1)).attr("y1", y).attr("y2", y).attr("stroke", "#e3e3df").attr("opacity", op * 0.8);
+    for (let t = 0; t < Math.min(c, upto); t++) pair(gg, sxT(t), y, icons[t][0], icons[t][1], size, op * (tailDim && t >= kB ? tailDim : 1)); };
+
+  // ---- beats 1-4: the failed rollout, the branch, the branch point, the tree of rewinds
+  if (f < 0.48) {
+    attemptScene(g, 1, { endFade: sub(f, 0, 0.05) });
+    const sp = sub(f, 0.05, 0.20) * nP, ring = sub(f, 0.20, 0.27), treeT = sub(f, 0.28, 0.44), treeOut = sub(f, 0.44, 0.48);
+    const dim = sub(sp, kB, kB + 1);
+    if (dim > 0) g.append("rect").attr("x", sxT(kB) - cwT / 2 - 2).attr("y", cyT - 20).attr("width", sxT(n - 1) - sxT(kB) + cwT + 4).attr("height", 40).attr("fill", "#f7f7f5").attr("opacity", 0.55 * dim);
+    if (sp > 0) {
+      const shared = g.append("g").attr("opacity", sub(sp, 0, 1) * (1 - treeOut));
+      shared.append("rect").attr("x", sxT(0) - cwT / 2 - 3).attr("y", cyT - 18).attr("width", sxT(kB - 1) - sxT(0) + cwT + 6).attr("height", 36).attr("rx", 8).attr("fill", PASS).attr("opacity", 0.10);
+      shared.append("text").attr("x", (sxT(0) + sxT(kB - 1)) / 2).attr("y", cyT + 34).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", MUTED).attr("opacity", sub(sp, kB - 1, kB)).text(`a second rollout with the same first ${kB} states`);
+      const upto = Math.min(nP, sp), pts = [];
+      for (let t = kB - 1; t <= Math.min(nP - 1, Math.floor(upto)); t++) pts.push([sxT(t), t < kB ? cyT : brY]);
+      if (upto > kB - 1 && pts.length > 1) g.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", PASS).attr("stroke-width", 2.5).attr("stroke-opacity", 0.75);
+      for (let t = kB; t < nP; t++) if (t <= upto) pair(g, sxT(t), brY, icP[t][0], icP[t][1], pillT, sub(upto, t, t + 0.4));
+      if (upto >= nP - 0.2) outcome(g, sxT(nP - 1) + 26, brY, true, 18, sub(upto, nP - 0.2, nP));
+      const bx = sxT(Math.min(upto, nP - 1)), by = upto < kB - 1 ? cyT : upto < kB ? lerp(cyT, brY, ease(upto - (kB - 1))) : brY;
+      if (treeT < 0.3) bot(g, bx, by - 29, 10).attr("opacity", 1 - sub(treeT, 0, 0.3));
+    }
+    if (ring > 0) { const rg = g.append("g").attr("opacity", ring * (1 - treeOut)), x = sxT(kB - 1);
+      rg.append("circle").attr("cx", x).attr("cy", cyT).attr("r", 17 + 2 * Math.sin(f * 400)).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2.5);
+      rg.append("text").attr("x", x).attr("y", cyT + 52).attr("text-anchor", "middle").attr("font-size", 12.5).attr("font-weight", 700).attr("fill", ACT).attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke").text("critical branch point"); }
+    if (treeT > 0) { const tg = g.append("g").attr("opacity", 1 - treeOut), lf1 = sub(treeT, 0, 0.45), lf2 = sub(treeT, 0.4, 0.9);
+      const branch = (i, j, y0, depth, seed) => { const pts = [[sxT(i), y0]]; let y = y0;
+        for (let t = i + 1; t < n; t++) { y += (j ? 1 : -1) * (5 + 9 * hash(seed, t, j)) / (depth + 1) + (hash(seed, t, j + 3) - 0.5) * 10; y = Math.max(62, Math.min(424, y)); pts.push([sxT(t), y]); } return pts; };
+      const drawPart = (pts, frac, w, op) => { const m = Math.max(2, Math.ceil(frac * (pts.length - 1)) + 1); tg.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts.slice(0, m))).attr("fill", "none").attr("stroke", "#8f8f8a").attr("stroke-width", w).attr("stroke-opacity", op); };
+      for (let i = 0; i < n - 1; i++) for (let j = 0; j < 2; j++) { const b1 = branch(i, j, cyT, 0, i * 7 + j);
+        if (lf1 > 0) drawPart(b1, lf1, 1.1, 0.45);
+        if (lf2 > 0) for (let m = 2; m < b1.length - 1; m += 3) for (let jj = 0; jj < 2; jj++) drawPart(branch(i + m, jj, b1[m][1], 1, i * 31 + m * 7 + jj), lf2, 0.6, 0.28); }
+      const exp = Math.min(n, treeT * n * 1.15), count = treeT >= 0.98 ? Math.pow(3, n) : Math.round(Math.pow(3, exp));
+      const box = tg.append("g").attr("transform", "translate(20,58)").attr("opacity", sub(treeT, 0, 0.1));
+      box.append("rect").attr("width", 262).attr("height", 64).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+      box.append("text").attr("x", 14).attr("y", 22).attr("font-size", 11).attr("fill", MUTED).text(`rollouts to rewind all ${n} steps, 3 choices each`);
+      box.append("text").attr("x", 14).attr("y", 50).attr("font-size", 22).attr("font-weight", 800).attr("fill", INK).text(d3.format(",")(count)); }
+    return;
+  }
+  drawBanner(g, opening);
+  // ---- beat 5: the few dozen rollouts we can afford
+  if (f < 0.60) { const q = sub(f, 0.48, 0.60), e1 = ease(sub(q, 0, 0.4)), pOut = 1 - sub(q, 0, 0.25);
+    if (pOut > 0) { const pg = g.append("g").attr("opacity", pOut), pts = d3.range(kB - 1, nP).map(t => [sxT(t), t < kB ? cyT : brY]);
+      pg.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", PASS).attr("stroke-width", 2.5).attr("stroke-opacity", 0.75);
+      for (let t = kB; t < nP; t++) pair(pg, sxT(t), brY, icP[t][0], icP[t][1], pillT); outcome(pg, sxT(nP - 1) + 26, brY, true, 18); }
+    const yF = lerp(cyT, laneY(iF), e1), sF = lerp(pillT, LP, e1);
+    lanePills(g, F, yF, sF, 1, n, lerp(0.45, 1, e1)); outcome(g, sxT(n - 1) + lerp(44.5, 10, e1), yF, false, lerp(18, 7, e1));
+    D.rolls.forEach((r, j) => { if (r === F) return; const lj = sub(q, 0.3 + j * 0.006, 0.66 + j * 0.006); if (lj <= 0) return; const c = cap(r), upto = Math.floor(lj * (c + 0.999));
+      lanePills(g, r, laneY(j), LP, Math.min(1, lj * 3), upto); if (upto >= c) outcome(g, sxT(c - 1) + 10, laneY(j), D.pass(r), 7); });
+    g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", sub(q, 0.7, 1)).text(`${N} independent rollouts of the same task`);
+    return; }
+  // ---- beat 6: many steps are nearly the same
+  const doms = (() => { const all = d3.range(1, D.S).map(t => { const m = d3.rollup(D.rolls.filter(r => t < r.n_steps), v => v.length, r => r.steps[t].c); const [c, cnt] = [...m].sort((a, b) => b[1] - a[1])[0]; return { t, c, cnt }; }).sort((a, b) => b.cnt - a.cnt);
+    const pick = [all[0]]; for (const d of all) if (pick.length < 2 && Math.abs(d.t - pick[0].t) >= 3) pick.push(d); return pick; })();
+  if (f < 0.68) { const q = sub(f, 0.60, 0.68), h = sub(q, 0, 0.3), pulse = 0.6 + 0.4 * Math.sin(f * 900);
+    D.rolls.forEach((r, j) => { lanePills(g, r, laneY(j), LP, 1, n); outcome(g, sxT(cap(r) - 1) + 10, laneY(j), D.pass(r), 7); });
+    doms.forEach(d => { g.append("rect").attr("x", sxT(d.t) - 11).attr("y", 58).attr("width", 22).attr("height", 366).attr("rx", 8).attr("fill", ACT).attr("opacity", 0.07 * h);
+      D.rolls.forEach((r, j) => { if (d.t < r.n_steps && r.steps[d.t].c === d.c) g.append("circle").attr("cx", sxT(d.t)).attr("cy", laneY(j)).attr("r", 5).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.2).attr("opacity", h * pulse); });
+      g.append("text").attr("x", sxT(d.t)).attr("y", 52).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", ACT).attr("opacity", h).text(`${d.cnt} of ${N} alike`); });
+    return; }
+  // ---- beat 7: similar steps snap into shared states; rollouts become paths through one map
+  const allEdges = [...D.edges.values()];
+  const drawNodes = (dimAmt, seenSet) => D.cols.forEach(col => col.nodes.forEach(nd => { const isSeen = seenSet.has(`${col.t}:${nd.c}`);
+    g.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nodeR(nd)).attr("fill", "#fff").attr("stroke", D.noise.get(nd.c) ? NOISE_STROKE : srColor(D.sr.get(nd.c))).attr("stroke-width", 3).attr("stroke-dasharray", D.noise.get(nd.c) ? "3,2" : null).attr("opacity", isSeen ? 1 : 1 - 0.7 * dimAmt); }));
+  if (f < 0.82) { const q = sub(f, 0.68, 0.82), snap = ease(sub(q, 0.05, 0.55)), routes = sub(q, 0.5, 0.95), hOut = 1 - sub(q, 0, 0.08);
+    if (routes > 0) allEdges.forEach(e => { const a = D.node(e.t, e.a), b = D.node(e.t + 1, e.b); g.append("path").attr("d", edgePath(a, b)).attr("fill", "none").attr("stroke", srColor(e.np / e.n)).attr("stroke-width", 0.8 + Math.sqrt(e.n) * 1.2).attr("stroke-opacity", 0.55 * routes); });
+    if (hOut > 0) doms.forEach(d => g.append("rect").attr("x", sxT(d.t) - 11).attr("y", 58).attr("width", 22).attr("height", 366).attr("rx", 8).attr("fill", ACT).attr("opacity", 0.07 * hOut));
+    D.rolls.forEach((r, j) => { const icons = D.ic(r), c = cap(r);
+      for (let t = 0; t < c; t++) { if (t < D.S) { const nd = D.node(t, r.steps[t].c); pair(g, lerp(sxT(t), nd.x + (hash(j, t, 5) - 0.5) * 6, snap), lerp(laneY(j), nd.y + (hash(j, t, 9) - 0.5) * 6, snap), icons[t][0], icons[t][1], LP, 1 - 0.85 * snap); }
+        else if (snap < 1) pair(g, sxT(t), laneY(j), icons[t][0], icons[t][1], LP, 1 - snap); }
+      if (snap < 1) outcome(g, sxT(c - 1) + 10, laneY(j), D.pass(r), 7, 1 - snap); });
+    if (snap > 0) D.cols.forEach(col => col.nodes.forEach(nd => g.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nodeR(nd) * snap).attr("fill", "#fff").attr("fill-opacity", snap).attr("stroke", D.noise.get(nd.c) ? NOISE_STROKE : srColor(D.sr.get(nd.c))).attr("stroke-width", 3).attr("stroke-dasharray", D.noise.get(nd.c) ? "3,2" : null).attr("opacity", snap)));
+    g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", snap).text("behavior states, first 12 steps · colour = how often rollouts through a state succeed");
+    return; }
+  // ---- beats 8-9: the map accrues one rollout at a time; the branch points surface
+  const q8 = sub(f, 0.82, 0.95), reset = sub(q8, 0, 0.12), st = f >= 0.95 ? N : sub(q8, 0.12, 1) * N, nIn = Math.min(N, Math.floor(st)), curF = st - nIn;
+  const acc = new Map(), seen = new Set();
+  for (let i = 0; i < nIn; i++) { const r = D.rolls[i]; for (let t = 0; t < Math.min(D.S, r.n_steps); t++) seen.add(`${t}:${r.steps[t].c}`);
+    for (let t = 0; t + 1 < Math.min(D.S, r.n_steps); t++) { const k = `${t}:${r.steps[t].c}>${r.steps[t + 1].c}`; if (!acc.has(k)) acc.set(k, { t, a: r.steps[t].c, b: r.steps[t + 1].c, n: 0, np: 0 }); const e = acc.get(k); e.n++; if (D.pass(r)) e.np++; } }
+  if (reset < 1) allEdges.forEach(e => { const a = D.node(e.t, e.a), b = D.node(e.t + 1, e.b); g.append("path").attr("d", edgePath(a, b)).attr("fill", "none").attr("stroke", srColor(e.np / e.n)).attr("stroke-width", 0.8 + Math.sqrt(e.n) * 1.2).attr("stroke-opacity", 0.55 * (1 - reset)); });
+  allEdges.forEach(e => { const a = D.node(e.t, e.a), b = D.node(e.t + 1, e.b); g.append("path").attr("d", edgePath(a, b)).attr("fill", "none").attr("stroke", "#c9c9c3").attr("stroke-width", 0.7).attr("stroke-opacity", 0.35 * reset); });
+  acc.forEach(e => { const a = D.node(e.t, e.a), b = D.node(e.t + 1, e.b); g.append("path").attr("d", edgePath(a, b)).attr("fill", "none").attr("stroke", srColor(e.np / e.n)).attr("stroke-width", 0.8 + Math.sqrt(e.n) * 1.4).attr("stroke-opacity", 0.6); });
+  drawNodes(reset, seen);
+  if (nIn < N && curF > 0 && f < 0.95) { const cur = D.rolls[nIn], c = Math.min(D.S, cur.n_steps), pts = route(cur, Math.floor(curF * (c + 0.999)));
+    if (pts.length > 1) g.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", D.pass(cur) ? PASS : FAIL).attr("stroke-width", 3).attr("stroke-opacity", 0.9);
+    if (pts.length) bot(g, pts[pts.length - 1][0], pts[pts.length - 1][1], 9); }
+  if (reset > 0) { const box = g.append("g").attr("transform", "translate(20,58)").attr("opacity", reset); box.append("rect").attr("width", 190).attr("height", 66).attr("rx", 10).attr("fill", "#fff").attr("fill-opacity", 0.92).attr("stroke", "#e3e3df");
+    [[`rollouts   ${nIn} / ${N}`, 22, 700], [`states   ${seen.size}`, 40, 400], [`edges   ${acc.size}`, 57, 400]].forEach(([t, y, w]) => box.append("text").attr("x", 14).attr("y", y).attr("font-size", 12).attr("font-weight", w).attr("fill", INK).text(t)); }
+  const q9 = sub(f, 0.95, 1);
+  if (q9 > 0) { const rv = g.append("g").attr("opacity", q9);
+    [[F, FAIL], [Pr, PASS]].forEach(([r, col]) => { const pts = route(r, D.S); rv.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).attr("fill", "none").attr("stroke", col).attr("stroke-width", 3.5).attr("stroke-opacity", 0.85); });
+    D.branchPts.forEach(bp => { const nd = D.node(bp.t, bp.c); rv.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nodeR(nd) + 8).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2.5); });
+    if (kB - 1 < D.S) { const nd = D.node(kB - 1, F.steps[kB - 1].c); rv.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nodeR(nd) + 13).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3");
+      rv.append("text").attr("x", nd.x).attr("y", nd.y - nodeR(nd) - 20).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", 700).attr("fill", ACT).attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke").text("the branch point from before"); }
+    rv.append("text").attr("x", 20).attr("y", 432).attr("font-size", 12).attr("font-weight", 700).attr("fill", ACT).text(`branch points: states whose next steps split by outcome · from ${N} rollouts, no rewinding`); }
 }
 
 // ---------- beats ----------
 const beats = {
   a1(svg, f) { attemptScene(svg, f); },
+  a2(svg, f) { branchScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");

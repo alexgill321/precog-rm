@@ -42,16 +42,32 @@
   <section class="beat" data-scene="a1" data-f0="0.925" data-f1="1.0" data-secs="3" data-hold="4">
     <div class="card"><p>Could we recover the outcome <b>without the grader</b>?</p><p class="big">Can the outcome be read from the actions and observations alone?</p></div>
   </section>
-  <section class="beat head wide" data-scene="act2" data-f0="0" data-f1="1" data-secs="62" data-hold="4">
-    <div class="card"><p class="act-n">2</p><h2>The map.</h2>
-<div class="num" data-n="6561" data-fmt="int">0</div><p class="numlabel">rollouts to re-sample eight steps, three ways each</p>
-      <p>Rewind that attempt, keep its first states, choose differently at one step, and it succeeds. That step is a critical branch point.</p>
-      <p class="small-text muted">Two real rollouts of the task that share their first states.</p>
-      <p>Finding every branch point by re-sampling is exponential. What we can afford is fifty independent attempts. But actions and observations repeat: the same lookup, the same refusal, the same confirmation, in different words. Cluster them by meaning and fifty attempts draw one map of behavior states.</p>
-      <p>Each new rollout mostly thickens edges it shares with earlier ones, tinting them toward success or failure. Now and then it adds a state.</p>
-      <p class="lands">The branch points surface without re-sampling.</p>
-      <p class="hinge">If the map keeps the outcome, a simple classifier should find it. ↓</p>
-    </div>
+  <section class="beat head" data-scene="a2" data-f0="0" data-f1="0.05" data-secs="2" data-hold="2">
+    <div class="card"><p class="act-n">2</p><h2>Critical branch points</h2><p>Somewhere along the way, the rollout made a decision it couldn’t recover from.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.05" data-f1="0.2" data-secs="7" data-hold="2.5">
+    <div class="card"><p>Rewind to that point and let the agent choose differently, and the same task can succeed.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.2" data-f1="0.27" data-secs="3" data-hold="2.5">
+    <div class="card"><p>That step is a <b class="a">critical branch point</b>: the decision made there settled the outcome.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.27" data-f1="0.48" data-secs="9" data-hold="2.5">
+    <div class="card"><p>Finding every branch point means rewinding at every step and trying every choice. With three choices per step, a 20-step task takes over three billion rollouts.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.48" data-f1="0.6" data-secs="6" data-hold="2.5">
+    <div class="card"><p>In practice, we can afford a few dozen independent rollouts of each task.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.6" data-f1="0.68" data-secs="3" data-hold="2.5">
+    <div class="card"><p>Many of their steps are nearly identical: the same lookup or the same question, phrased differently.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.68" data-f1="0.82" data-secs="7" data-hold="2.5">
+    <div class="card"><p>Grouping similar steps across rollouts into shared <b>states</b> turns every rollout into a path through one map.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.82" data-f1="0.95" data-secs="12" data-hold="2.5">
+    <div class="card"><p>Each new rollout mostly reinforces paths already on the map, pulling them toward success or failure, and occasionally adds a new state.</p></div>
+  </section>
+  <section class="beat" data-scene="a2" data-f0="0.95" data-f1="1.0" data-secs="3" data-hold="4">
+    <div class="card"><p class="big">Our hypothesis: grouping similar steps into states lets a few dozen rollouts reveal the critical branch points, without rewinding.</p></div>
   </section>
   <section class="beat head wide" data-scene="act3" data-f0="0" data-f1="1" data-secs="9" data-hold="3">
     <div class="card"><p class="act-n">3</p><h2>The finding.</h2>
@@ -163,8 +179,8 @@
 <script src="app.js?v=11"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=9"></script>
+<script src="opening.js?v=12"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=4"></script>
+<script src="stage.js?v=5"></script>
 </body>
 </html>

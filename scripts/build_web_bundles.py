@@ -201,7 +201,8 @@ def build(benchmark, policy, task, models, held_out):
                   "note": f"reduced to {RAW_DIMS} principal components fitted on this task's full rollouts"}
     bundle = {
         "benchmark": benchmark, "policy": policy, "task": task, "task_id": task_label(benchmark, task),
-        "domain": info.get("domain") or info.get("category"), "success_rate": info.get("success_rate"),
+        "domain": info.get("domain") or info.get("category"),
+        "success_rate": info["success_rate"] if info.get("success_rate") is not None else round(float(np.mean([r["reward"] >= 0.5 for r in rollouts])), ROUND),
         "held_out": task_label(benchmark, task) in held_out, "n_rollouts": len(rollouts),
         "cluster_protocol": {"method": "hdbscan", "min_cluster_size": MCS, "affinity": "0.5*(cos_action+cos_observation)", "noise": NOISE},
         "stop_threshold": STOP_THRESHOLD, "cv_folds": cv_folds(rollouts),

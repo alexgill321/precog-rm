@@ -22,25 +22,25 @@
     </div>
   </section>
   <section class="beat head" data-scene="a1" data-f0="0.062" data-f1="0.115" data-secs="2.5" data-hold="2.5">
-    <div class="card"><p class="act-n">1</p><h2>A single agentic rollout</h2><p>A tool-using agent receives a task.</p></div>
+    <div class="card"><p class="act-n">1</p><h2>A single agentic rollout</h2><p>A tool-using agent is given a task.</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.115" data-f1="0.156" data-secs="2.5" data-hold="2.5">
-    <div class="card"><p>Every step, the agent performs an <b class="a">action</b>: a tool call, or a message to the user.</p></div>
+    <div class="card"><p>At each step, the agent takes an <b class="a">action</b>: a tool call or a message to the user.</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.156" data-f1="0.191" data-secs="2.5" data-hold="2.5">
-    <div class="card"><p>And receives a <b class="o">response</b> from the environment: a reply from the user, or the output of a tool.</p></div>
+    <div class="card"><p>The environment responds with an <b class="o">observation</b>: a reply from the user or the output of a tool.</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.191" data-f1="0.375" data-secs="8" data-hold="2">
-    <div class="card"><p>A single agentic rollout produces many actions and environmental observations…</p></div>
+    <div class="card"><p>One rollout produces a long sequence of actions and observations…</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.375" data-f1="0.8" data-secs="8" data-hold="2.5">
-    <div class="card"><p>…until the agent believes it has completed the task.</p></div>
+    <div class="card"><p>…until the agent decides it has finished the task.</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.8" data-f1="0.925" data-secs="5" data-hold="2.5">
-    <div class="card"><p>A grader checks the end state and determines whether the agent completed the task successfully. In this case, the agent <b class="fail">failed</b>.</p></div>
+    <div class="card"><p>A grader then checks the final state to determine whether the agent succeeded. Here, it <b class="fail">failed</b>.</p></div>
   </section>
   <section class="beat" data-scene="a1" data-f0="0.925" data-f1="1.0" data-secs="3" data-hold="4">
-    <div class="card"><p>But what if we wanted to recover the outcome of the rollout <b>without the grader</b>?</p><p class="big">Is it possible to read the outcome of a rollout from the actions and environmental observations alone?</p></div>
+    <div class="card"><p>Could we recover the outcome <b>without the grader</b>?</p><p class="big">Can the outcome be read from the actions and observations alone?</p></div>
   </section>
   <section class="beat head wide" data-scene="act2" data-f0="0" data-f1="1" data-secs="62" data-hold="4">
     <div class="card"><p class="act-n">2</p><h2>The map.</h2>

@@ -486,6 +486,74 @@ function findingScene(svg, f) {
     lgd.append("text").attr("x", lw).attr("y", 20).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text("1.0 · every success ranked above every failure"); }
 }
 
+// ---------- the obstacle (act 4) ----------
+// a second task under the same agent, so act 4 can show that nothing learned on the story's task carries over
+let D2 = null;
+function loadSecond() { const P = window.PrecogData; if (!P || !B) return;
+  const cand = P.index.tasks.filter(t => t.benchmark === B.benchmark && t.policy === B.policy && t.task !== B.task); if (!cand.length) { D2 = null; return; }
+  const t = cand.find(x => x.held_out && x.domain === B.domain) || cand.find(x => x.held_out) || cand[0];   // same domain if possible: even a similar task has its own states if (D2 && D2.task === t.task && D2.policy === t.policy) return;
+  fetch(P.url(t)).then(r => r.json()).then(b2 => { D2 = { b: b2, G: graphOf(b2), task: t.task, policy: t.policy, id: t.task_id }; }).catch(() => { D2 = null; }); }
+document.addEventListener("precog:index", loadSecond);
+// Figure 3 of the paper: the best per-task classifier at k labeled rollouts per class (max of NC, RBF-SVM, fastText 1-gram)
+const FEW_K = [1, 2, 4, 8], FEW_B = [["tau2", "Tau2-Bench", "#2b5fb3"], ["bfclv3", "BFCLv3", "#5f86cf"], ["agentclinic", "AgentClinic", "#97b0e0"]];
+function obstacleScene(svg, f) {
+  const g = svg.append("g"), C = D.clf, opening = D.pairFP.f.opening || "";
+  const q1 = sub(f, 0, 0.22), q2 = sub(f, 0.22, 0.58), q3 = sub(f, 0.58, 0.86);
+  const x1 = sub(q1, 0, 0.3), chartIn = sub(q2, 0, 0.12) * (1 - sub(q3, 0, 0.2)), morph = ease(sub(q3, 0.1, 0.6));
+  // the map sits where act 3 left it, steps aside for the chart, then returns as the second task's map
+  const side = ease(sub(q2, 0, 0.15)) * (1 - ease(sub(q3, 0, 0.25)));
+  const k = lerp(0.8, 0.5, side), tx = lerp(8, 0, side), ty = lerp(22, 88, side);
+  const wCol = (wv) => srColor(1 / (1 + Math.exp(-wv * Math.log(0.9 / 0.1) / C.refW))), amtOf = (wv) => Math.min(1, Math.abs(wv) / (0.6 * C.refW));
+  // the task banner: the old task's text fades out fully before the new one fades in, over a box that stays put
+  if (D2 && morph > 0) g.append("rect").attr("x", 20).attr("y", 10).attr("width", 860).attr("height", 38).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+  drawBanner(g, opening, D2 ? 1 - sub(morph, 0, 0.45) : 1 - morph);
+  if (D2 && morph > 0.55) drawBanner(g, D2.b.rollouts.find(r => r.opening)?.opening || D2.id, sub(morph, 0.55, 1));
+  const mg = g.append("g").attr("opacity", x1 * (1 - morph)).attr("transform", `translate(${tx},${ty}) scale(${k})`);
+  D.gedges.forEach(e => { const wv = C.wOf(`${e.a}>${e.b}`), a = amtOf(wv); drawEdge(mg, e, d3.interpolateRgb(NEU, wCol(wv))(a), 0.45 + 0.75 * a, e.nr, 1.2 * a); });
+  D.gnodes.forEach(nd => { const wv = C.wOf(`s${nd.c}`); drawState(mg, nd, 1, 1, d3.interpolateRgb(NEU, wCol(wv))(amtOf(wv))); });
+  noiseLabel(mg, 0.6);
+  if (morph > 0) { const m2 = g.append("g").attr("opacity", morph).attr("transform", `translate(${tx},${ty}) scale(${k})`);
+    if (D2) { D2.G.gedges.forEach(e => drawEdge(m2, e, NEU, 0.6, e.nr, 0, D2.G)); D2.G.gnodes.forEach(nd => drawState(m2, nd, 1, 1, NEU)); noiseLabel(m2, 0.6, D2.G); }
+    else { D.gedges.forEach(e => drawEdge(m2, e, NEU, 0.3)); D.gnodes.forEach(nd => drawState(m2, nd, 1, 0.5, NEU)); } }
+  // act 3's last frame dissolves into this one
+  if (x1 < 1) findingScene(g.append("g").attr("opacity", 1 - x1), 1);
+  // the labeled rollouts behind the classifier: all of them, then one batch's worth, then fewer, then none on the new task
+  const lab = [...C.train].sort((a, c) => a.rid - c.rid), rnd = ((sd) => () => (sd = (sd * 1664525 + 1013904223) % 4294967296) / 4294967296)(1);
+  const order = new Map(); { const P = lab.filter(D.pass), Fl = lab.filter(r => !D.pass(r)); [P, Fl].forEach(arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } a.forEach((r, i) => order.set(r, i)); }); }
+  const steps = [[0.2, 8], [0.4, 4], [0.6, 2], [0.8, 1]], stepAt = steps.filter(([t]) => q2 >= t).pop(), perClass = q3 > 0.15 ? 0 : stepAt ? stepAt[1] : Infinity;
+  const nLab = perClass === Infinity ? lab.length : Math.min(lab.filter(D.pass).length, perClass) + Math.min(lab.filter(r => !D.pass(r)).length, perClass);
+  const rowIn = sub(q1, 0.4, 0.7), ry = 404, rx = (i) => 64 + i * 13;
+  if (rowIn > 0) { const rg = g.append("g").attr("opacity", rowIn);
+    halo(rg.append("text").attr("x", 52).attr("y", ry - 16).attr("font-size", 10.5).attr("fill", MUTED)).text(perClass === 0 ? "labeled rollouts of this task: 0" : `labeled rollouts: ${nLab}${perClass !== Infinity ? ` (${perClass} per class)` : ""}`);
+    lab.forEach((r, i) => { const keep = perClass === Infinity || order.get(r) < perClass; const fade = keep ? 1 : 0.12, gone = sub(q3, 0.1, 0.3);
+      rg.append("circle").attr("cx", rx(i)).attr("cy", ry).attr("r", 4.6).attr("fill", D.pass(r) ? PASS : FAIL).attr("opacity", fade * (1 - gone)); });
+    if (sub(q3, 0.2, 0.4) > 0) lab.forEach((r, i) => rg.append("circle").attr("cx", rx(i)).attr("cy", ry).attr("r", 4.2).attr("fill", "none").attr("stroke", "#c9c9c3").attr("stroke-dasharray", "2,2").attr("opacity", sub(q3, 0.2, 0.4))); }
+  // the paper's Figure 3: fewer labels, lower AUROC, on every benchmark
+  if (chartIn > 0 && RES && RES.fewshot) { const cg = g.append("g").attr("opacity", chartIn), X0 = 540, X1 = 790, Y0 = 350, Y1 = 110;
+    const xs = d3.scaleLog().base(2).domain([1, 8]).range([X0, X1]), ys = d3.scaleLinear().domain([0.6, 0.95]).range([Y0, Y1]);
+    cg.append("text").attr("x", X0 - 30).attr("y", 72).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text("Fewer labels, worse predictions");
+    cg.append("text").attr("x", X0 - 30).attr("y", 89).attr("font-size", 10.5).attr("fill", MUTED).text("best per-task classifier · AUROC on held-out tasks · paper, Figure 3");
+    [0.6, 0.7, 0.8, 0.9].forEach(v => { cg.append("line").attr("x1", X0 - 8).attr("x2", X1).attr("y1", ys(v)).attr("y2", ys(v)).attr("stroke", "#ecece8");
+      cg.append("text").attr("x", X0 - 14).attr("y", ys(v) + 4).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text(v.toFixed(1)); });
+    FEW_K.forEach(kk => cg.append("text").attr("x", xs(kk)).attr("y", Y0 + 18).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", INK).text(kk));
+    cg.append("text").attr("x", (X0 + X1) / 2).attr("y", Y0 + 36).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", MUTED).text("labeled rollouts per class");
+    // a GRPO batch: 16 rollouts, so at most 8 per class
+    cg.append("line").attr("x1", xs(8)).attr("x2", xs(8)).attr("y1", Y1 - 4).attr("y2", Y0).attr("stroke", MUTED).attr("stroke-dasharray", "3,3");
+    cg.append("text").attr("x", xs(8) - 6).attr("y", Y0 - 8).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text("one GRPO batch: 16 rollouts");
+    const shownK = stepAt ? stepAt[1] : 16, upTo = FEW_K.filter(kk => kk >= shownK);
+    if (stepAt) cg.append("line").attr("x1", xs(shownK)).attr("x2", xs(shownK)).attr("y1", Y1).attr("y2", Y0).attr("stroke", INK).attr("stroke-width", 1.2).attr("opacity", 0.35);
+    FEW_B.forEach(([bn, label, col]) => { const byK = RES.fewshot[bn]; if (!byK) return; const best = (kk) => d3.max(["NC", "RBF", "FT1"], m => byK[String(kk)][m]);
+      const pts = upTo.map(kk => [xs(kk), ys(best(kk))]);
+      if (pts.length > 1) cg.append("path").attr("d", d3.line()(pts)).attr("fill", "none").attr("stroke", col).attr("stroke-width", 2.5);
+      pts.forEach(([x, y]) => cg.append("circle").attr("cx", x).attr("cy", y).attr("r", 4).attr("fill", col));
+      if (pts.length) cg.append("text").attr("x", xs(8) + 8).attr("y", ys(best(8)) + 4).attr("font-size", 10.5).attr("fill", col).attr("font-weight", 700).text(label); }); }
+  // captions, one per beat
+  const caps = [[sub(q1, 0.6, 0.9) * (1 - sub(q2, 0, 0.1)), `the classifier from act 3: fit on ${lab.length} labeled rollouts of this task`],
+    [sub(q2, 0, 0.1) * (1 - sub(q3, 0, 0.1)), "the classifiers here: nearest centroid, RBF-SVM and fastText, refit for each task; best of the three shown"],
+    [sub(q3, 0.3, 0.5), D2 ? `a different task, ${D2.id}, same agent: ${D2.G.gnodes.filter(n => !n.noise).length} states of its own · nothing learned on ${B.task_id} applies` : "a different task: none of these states exist there, so nothing learned applies"]];
+  caps.forEach(([op, t]) => { if (op > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", op).text(t); });
+}
+
 // ---------- the state-map panel (act 3's "look inside"): any task's global state graph, coloured by outcome ----------
 const graphCache = new WeakMap();
 function graphOf(b) { if (!graphCache.has(b)) graphCache.set(b, buildGraph(b.rollouts, (r) => r.reward >= 0.5, new Map(b.clusters.map(c => [c.id, c.noise])))); return graphCache.get(b); }
@@ -514,6 +582,7 @@ const beats = {
   a1(svg, f) { attemptScene(svg, f); },
   a2(svg, f) { branchScene(svg, f); },
   a3(svg, f) { findingScene(svg, f); },
+  a4(svg, f) { obstacleScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");
@@ -616,7 +685,7 @@ function bindText() { const r = D.pairFP.f, gr = r.grader;
   document.querySelectorAll('[data-bind="grader-summary"]').forEach(el => { if (!gr) { el.textContent = ""; return; }
     const ok = gr.basis.filter(b => (gr.breakdown[b] ?? 0) >= 0.5).map(b => OK[b] || `${b.toLowerCase()} passed`), bad = gr.basis.filter(b => (gr.breakdown[b] ?? 0) < 0.5).map(b => BAD[b] || `${b.toLowerCase()} failed`);
     el.textContent = cap(ok.length && bad.length ? `${ok.join(" and ")}, but ${bad.join(" and ")}.` : `${(bad.length ? bad : ok).join(" and ")}.`); }); }
-function load(b) { B = b; D = prep(b); bindText(); document.dispatchEvent(new CustomEvent("precog:opening")); }
+function load(b) { B = b; D = prep(b); bindText(); loadSecond(); document.dispatchEvent(new CustomEvent("precog:opening")); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);
 window.PrecogOpening = { draw, mapPanel, get data() { return D; } };

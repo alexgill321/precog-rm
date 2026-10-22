@@ -27,6 +27,9 @@ async function init() {
   refreshPolicies();
   initMapSelectors();
   if ($("#n-bundled")) $("#n-bundled").textContent = INDEX.tasks.length;
+  // the scenes fetch a second task (act 4) through this
+  window.PrecogData = { index: INDEX, url: (t) => `${DATA_BASE}/${t.benchmark}/${t.policy}/${t.task}.json?v=${DATA_V}` };
+  document.dispatchEvent(new CustomEvent("precog:index"));
   const q = new URLSearchParams(location.search);
   if (q.get("task")) {
     const t = INDEX.tasks.find(x => x.task === q.get("task"));

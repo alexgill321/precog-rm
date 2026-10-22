@@ -89,14 +89,18 @@
     <div class="card"><p class="big">Successes and failures separate: the outcome can be read from the actions and observations alone.</p>
       <button class="inside" data-panel="flow">Look inside: the state map of one task</button></div>
   </section>
-  <section class="beat head wide" data-scene="act4" data-f0="0" data-f1="1" data-secs="10" data-hold="3">
-    <div class="card"><p class="act-n">4</p><h2>The obstacle.</h2>
-<div class="num" data-n="33" data-fmt="int">0</div><p class="numlabel">labeled rollouts per task, and none of it carries over</p>
-      <p>A per-task classifier is capped by the labeled rollouts one task provides, and it knows nothing about the next task. Shrink the labels and it falls apart; change the task and it starts from zero.</p>
-      <div id="falloff" class="chart"></div>
-      <p class="lands">Per-task fitting transfers nothing.</p>
-      <p class="hinge">So learn the representation instead. ↓</p>
-    </div>
+  <section class="beat head" data-scene="a4" data-f0="0" data-f1="0.22" data-secs="6" data-hold="2.5">
+    <div class="card"><p class="act-n">4</p><h2>The obstacle</h2><p>That classifier learned from the labeled rollouts of this one task:</p>
+      <div class="num" data-n="33" data-fmt="int">0</div><p class="numlabel">labeled rollouts behind it</p></div>
+  </section>
+  <section class="beat" data-scene="a4" data-f0="0.22" data-f1="0.58" data-secs="9" data-hold="2.5">
+    <div class="card"><p>During RL training, a task supplies only one batch of rollouts at a time, and with fewer labels, per-task classifiers predict worse.</p></div>
+  </section>
+  <section class="beat" data-scene="a4" data-f0="0.58" data-f1="0.86" data-secs="6" data-hold="2.5">
+    <div class="card"><p>And none of it carries over. A new task has its own states, so its classifier starts again from zero.</p></div>
+  </section>
+  <section class="beat" data-scene="a4" data-f0="0.86" data-f1="1.0" data-secs="3" data-hold="4">
+    <div class="card"><p class="big">So instead of fitting a classifier to each task, we learn the representation itself, across many tasks.</p></div>
   </section>
   <section class="beat head wide" data-scene="act5" data-f0="0" data-f1="1" data-secs="40" data-hold="3">
     <div class="card"><p class="act-n">5</p><h2>The idea.</h2>
@@ -186,11 +190,11 @@
 </div>
 
 <script src="icons.js?v=2"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=27"></script>
+<script src="opening.js?v=31"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=6"></script>
+<script src="stage.js?v=7"></script>
 </body>
 </html>

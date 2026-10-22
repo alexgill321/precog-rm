@@ -76,7 +76,37 @@ function prep(b) {
       const A = wordsOf(A0.r.steps[A0.t].a), Bw = wordsOf(B0.r.steps[B0.t].a), inter = [...A].filter(w => Bw.has(w)).length, jac = inter / Math.max(1, A.size + Bw.size - inter);
       if (jac <= 0.15 || jac >= 0.6) continue; const score = nd.n * (1 - Math.abs(jac - 0.35)) * (Math.abs(A0.t - B0.t) >= 2 ? 3 : 1);
       if (!simPair || score > simPair.score) simPair = { c: nd.c, a: A0.t <= B0.t ? A0 : B0, b: A0.t <= B0.t ? B0 : A0, score, n: nd.n }; } });
-  return { rolls, S, L, sr, noise, pass, ic, pairFP: best, prefix, simPair, gnodes, gnode, gedges, cols, node, edges, branchPts, laneY: (i) => 36 + i * (390 / (rolls.length - 1)), xStep: (t) => 70 + t * (780 / (S - 1)) };
+  // act 3: a linear classifier over the states and transitions each rollout passes through (length-normalised counts,
+  // L2 logistic regression), fit on two cross-validation thirds and scored on the third held out. All three folds are fit;
+  // the page shows the fold whose held-out AUROC is closest to the three-fold mean, so the example is typical, not the best.
+  const folds = (b.cv_folds || []).filter(fo => fo.length);
+  const stepFeats = (r, t) => { const ks = [`s${r.steps[t].c}`]; if (t > 0) ks.push(`${r.steps[t - 1].c}>${r.steps[t].c}`); return ks; };
+  const feats = (r) => { const v = new Map(); for (let t = 0; t < r.n_steps; t++) stepFeats(r, t).forEach(k => v.set(k, (v.get(k) || 0) + 1 / r.n_steps)); return v; };
+  const aurocOf = (rs, sf) => { let num = 0, den = 0; rs.forEach(a => { if (!pass(a)) return; rs.forEach(c => { if (pass(c)) return; den++; const d = sf(a) - sf(c); num += d > 0 ? 1 : d === 0 ? 0.5 : 0; }); }); return den ? num / den : 0.5; };
+  const fitFold = (testIds) => { const train = rolls.filter(r => !testIds.has(r.rid)), heldOut = rolls.filter(r => testIds.has(r.rid)), w = new Map(); let b0 = 0;
+    const X = train.map(feats), y = train.map(r => pass(r) ? 1 : 0);
+    for (let it = 0; it < 400; it++) { const gr = new Map(); let gb = 0;
+      X.forEach((x, i) => { let z = b0; x.forEach((v, k) => z += (w.get(k) || 0) * v); const d = 1 / (1 + Math.exp(-z)) - y[i]; gb += d; x.forEach((v, k) => gr.set(k, (gr.get(k) || 0) + d * v)); });
+      b0 -= 0.5 * gb / X.length; gr.forEach((gv, k) => w.set(k, (w.get(k) || 0) - 0.5 * (gv / X.length + 0.01 * (w.get(k) || 0)))); }
+    // the score after reading u steps (fractional), so a marker can follow a rollout as it is read; u = n_steps gives the full score
+    const partial = (r, u) => { let z = b0; const n = r.n_steps, whole = Math.min(n, Math.floor(u));
+      for (let t = 0; t < whole; t++) stepFeats(r, t).forEach(k => z += (w.get(k) || 0) / n);
+      if (whole < n && u > whole) stepFeats(r, whole).forEach(k => z += (u - whole) * (w.get(k) || 0) / n); return z; };
+    const score = (r) => partial(r, r.n_steps);
+    return { train, heldOut, w, b0, partial, score, auroc: aurocOf(heldOut, score) }; };
+  const fits = folds.map(fo => fitFold(new Set(fo))), meanAuroc = d3.mean(fits, x => x.auroc);
+  const fi = fits.length ? d3.minIndex(fits, x => Math.abs(x.auroc - meanAuroc)) : 0, fit = fits[fi] || fitFold(new Set(rolls.slice(0, 17).map(r => r.rid)));
+  // presentation order: the success it scores highest, the failure it scores lowest, the median rollout, then the rest
+  const byScore = [...fit.heldOut].sort((a, c) => fit.score(c) - fit.score(a)), ho = [];
+  [byScore.find(pass), [...byScore].reverse().find(r => !pass(r)), byScore[Math.floor(byScore.length / 2)]].forEach(r => { if (r && !ho.includes(r)) ho.push(r); });
+  fit.heldOut.forEach(r => { if (!ho.includes(r)) ho.push(r); });
+  const sc = ho.map(fit.score), lo = d3.min(sc), hi = d3.max(sc), pad = (hi - lo) * 0.06 || 1, yS = d3.scaleLinear().domain([lo - pad, hi + pad]).range([372, 96]).clamp(true);
+  const dots = ho.map((r, i) => ({ r, i, s: sc[i], x: 800, y: yS(sc[i]), ty: yS(sc[i]) }));
+  const dsim = d3.forceSimulation(dots).force("x", d3.forceX(800).strength(0.12)).force("y", d3.forceY(d => d.ty).strength(1)).force("collide", d3.forceCollide(6.2).iterations(3)).stop();
+  for (let i = 0; i < 200; i++) dsim.tick();
+  // colour scale for the learned weights: the 90th percentile of |w|, so one large weight does not wash out the rest
+  const clf = { fold: fi, foldAurocs: fits.map(x => x.auroc), meanAuroc, ...fit, heldOut: ho, yS, dots, refW: d3.quantile([...fit.w.values()].map(Math.abs).sort(d3.ascending), 0.9) || 1, wOf: (k) => fit.w.get(k) || 0 };
+  return { rolls, S, L, sr, noise, pass, ic, pairFP: best, prefix, simPair, clf, gnodes, gnode, gedges, cols, node, edges, branchPts, laneY: (i) => 36 + i * (390 / (rolls.length - 1)), xStep: (t) => 70 + t * (780 / (S - 1)) };
 }
 
 // ---------- helpers for a lane of pills ----------
@@ -200,6 +230,21 @@ function attemptScene(svg, f, opt = {}) {
 
 
 // ---------- act 2: from one failed rollout to the map of behavior states ----------
+// ---------- the state map, shared by acts 2 and 3 ----------
+const NEU = "#b9b9b3", halo = (t) => t.attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke");
+// a transition between two states: forward edges bow alternately up or down, back edges arc over the top, self-loops sit on top of the node
+const gEdgePath = (e) => { const a = D.gnode.get(e.a), b = D.gnode.get(e.b);
+  if (e.a === e.b) { const r = a.r; return `M${a.x - r * 0.5},${a.y - r * 0.85} C${a.x - r * 1.4},${a.y - r * 2.5} ${a.x + r * 1.4},${a.y - r * 2.5} ${a.x + r * 0.5},${a.y - r * 0.85}`; }
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+  const bend = dx >= 0 ? (hash(e.a, e.b, 3) < 0.5 ? 1 : -1) * Math.min(46, 0.14 * len) : Math.min(90, 0.3 * len);
+  return `M${a.x},${a.y} Q${(a.x + b.x) / 2 + nx * bend},${(a.y + b.y) / 2 + ny * bend} ${b.x},${b.y}`; };
+const isNoiseE = (e) => D.gnode.get(e.a).noise || D.gnode.get(e.b).noise, edgeW = (nr) => 0.5 + Math.sqrt(nr) * 0.7;
+const drawEdge = (gg, e, col, op, nr = e.nr, w0 = 0) => gg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", col).attr("stroke-width", edgeW(nr) + w0)
+  .attr("stroke-opacity", op * (0.22 + 0.5 * Math.min(1, nr / 20)) * (isNoiseE(e) ? 0.6 : 1)).attr("stroke-dasharray", isNoiseE(e) ? "3,3" : null);
+const drawState = (gg, nd, rScale, op, col) => gg.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nd.r * rScale).attr("fill", "#fff").attr("stroke", col).attr("stroke-width", 2.6).attr("stroke-dasharray", nd.noise ? "3,2" : null).attr("opacity", op);
+const noiseLabel = (gg, op) => { const nd = D.gnodes.find(d => d.noise); if (nd && op > 0) halo(gg.append("text").attr("x", nd.x + nd.r + 7).attr("y", nd.y + 4).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op)).text("unclustered steps"); };
+const routeOf = (r) => d3.range(r.n_steps - 1).map(t => ({ a: r.steps[t].c, b: r.steps[t + 1].c }));
+
 function drawBanner(g, opening, op = 1) { const ban = g.append("g").attr("opacity", op);
   ban.append("rect").attr("x", 20).attr("y", 10).attr("width", 860).attr("height", 38).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
   icon(ban, "clipboard-list", 40, 29, 18, INK); ban.append("text").attr("x", 58).attr("y", 33).attr("font-size", 12.5).attr("fill", INK).text(`Task · “${opening.length > 100 ? opening.slice(0, 99) + "…" : opening}”`); }
@@ -208,7 +253,6 @@ function branchScene(svg, f) {
   const K = 860 / (n + 1), sxT = (i) => 20 + (i + 0.55) * K, cyT = 196, cwT = 0.84 * K, pillT = Math.min(cwT / 1.5, Math.max(26, cwT * 0.6) / 2.9) * 0.92;
   const laneY = (i) => 66 + i * (350 / (N - 1)), cap = (r) => Math.min(n, r.n_steps), opening = F.opening || "", icF = D.ic(F);
   const edgePath = (a, b) => `M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`, nodeR = (nd) => 5 + Math.sqrt(nd.n) * 2.2;
-  const halo = (t) => t.attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke");
   const lanePills = (gg, r, y, size, op, upto) => { const c = cap(r), icons = D.ic(r);
     gg.append("line").attr("x1", sxT(0)).attr("x2", sxT(c - 1)).attr("y1", y).attr("y2", y).attr("stroke", "#e3e3df").attr("opacity", op * 0.8);
     for (let t = 0; t < Math.min(c, upto); t++) pair(gg, sxT(t), y, icons[t][0], icons[t][1], size, op); };
@@ -294,21 +338,9 @@ function branchScene(svg, f) {
   // ---- beat 5: fifty attempts from the same gate: attempt 1 settles, attempts 2-4 run visibly, the rest fan out
   if (f < 0.60) { lanes(g, sub(f, 0.48, 0.60), 1, 1, 0); return; }
   // ---- beats 6-7: a pair of near-identical steps (same state, different steps) lifts out; then every step snaps into the global states
-  const sp = D.simPair, q6 = sub(f, 0.60, 0.70), q7 = sub(f, 0.70, 0.84), NEU = "#b9b9b3";
+  const sp = D.simPair, q6 = sub(f, 0.60, 0.70), q7 = sub(f, 0.70, 0.84);
   const lift = f < 0.70 ? ease(sub(q6, 0.2, 0.6)) : 1 - ease(sub(q7, 0, 0.2)), mark = f < 0.70 ? sub(q6, 0, 0.2) : 1 - sub(q7, 0, 0.2);
   const cardsIn = f < 0.70 ? sub(q6, 0.45, 0.75) : 1 - sub(q7, 0, 0.12);
-  // a transition between two states: forward edges bow alternately up or down, back edges arc over the top, self-loops sit on top of the node
-  const gEdgePath = (e) => { const a = D.gnode.get(e.a), b = D.gnode.get(e.b);
-    if (e.a === e.b) { const r = a.r; return `M${a.x - r * 0.5},${a.y - r * 0.85} C${a.x - r * 1.4},${a.y - r * 2.5} ${a.x + r * 1.4},${a.y - r * 2.5} ${a.x + r * 0.5},${a.y - r * 0.85}`; }
-    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-    const bend = dx >= 0 ? (hash(e.a, e.b, 3) < 0.5 ? 1 : -1) * Math.min(46, 0.14 * len) : Math.min(90, 0.3 * len);
-    return `M${a.x},${a.y} Q${(a.x + b.x) / 2 + nx * bend},${(a.y + b.y) / 2 + ny * bend} ${b.x},${b.y}`; };
-  const isNoiseE = (e) => D.gnode.get(e.a).noise || D.gnode.get(e.b).noise, edgeW = (nr) => 0.5 + Math.sqrt(nr) * 0.7;
-  const drawEdge = (gg, e, col, op, nr = e.nr, w0 = 0) => gg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", col).attr("stroke-width", edgeW(nr) + w0)
-    .attr("stroke-opacity", op * (0.22 + 0.5 * Math.min(1, nr / 20)) * (isNoiseE(e) ? 0.6 : 1)).attr("stroke-dasharray", isNoiseE(e) ? "3,3" : null);
-  const drawState = (gg, nd, rScale, op, col) => gg.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nd.r * rScale).attr("fill", "#fff").attr("stroke", col).attr("stroke-width", 2.6).attr("stroke-dasharray", nd.noise ? "3,2" : null).attr("opacity", op);
-  const noiseLabel = (gg, op) => { const nd = D.gnodes.find(d => d.noise); if (nd && op > 0) halo(gg.append("text").attr("x", nd.x + nd.r + 7).attr("y", nd.y + 4).attr("font-size", 10).attr("fill", MUTED).attr("opacity", op)).text("unclustered steps"); };
-  const routeOf = (r) => d3.range(r.n_steps - 1).map(t => ({ a: r.steps[t].c, b: r.steps[t + 1].c }));
   const drawCard = (o, x0, y0, w, h, label) => { const t = o.t, r = o.r, px = xL(t), py = laneY(laneOf.get(r));
     const cg = g.append("g").attr("transform", `translate(${lerp(px, x0, lift)},${lerp(py, y0, lift)}) scale(${lerp(0.03, 1, lift)})`).attr("opacity", Math.min(1, lift * 1.5));
     cg.append("rect").attr("width", w).attr("height", h).attr("rx", 12).attr("fill", "#fff").attr("stroke", "#c9c9c3").attr("stroke-width", 1.4);
@@ -365,10 +397,94 @@ function branchScene(svg, f) {
   if (hi > 0) halo(g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).attr("opacity", hi)).text("left in colour: states, and transitions between them, where at least four in five rollouts passing through end the same way");
 }
 
+// ---------- the finding (act 3) ----------
+// Table 1 of the paper, for the closing chart: the best simple per-task classifier in each benchmark x model cell
+let RES = null; fetch("results.json?v=5").then(r => r.json()).then(j => { RES = j; }).catch(() => {});
+const BENCH_L = { tau2: "Tau2-Bench", bfclv3: "BFCLv3", agentclinic: "AgentClinic" }, MODEL_L = { deepseek: "DeepSeek-V3.2", qwen: "Qwen3-80B", gpt5mini: "GPT-5-mini" };
+const METH_L = { NC: "nearest centroid", RBF: "RBF-SVM", FT1: "fastText, 1-gram", FT2: "fastText, 2-gram", FT5: "fastText, 5-gram" };
+function findingScene(svg, f) {
+  const g = svg.append("g"), C = D.clf, AX = 800, nH = C.heldOut.length, nT = C.train.length, opening = D.pairFP.f.opening || "";
+  const q1 = sub(f, 0, 0.10), q2 = sub(f, 0.10, 0.25), q3 = sub(f, 0.25, 0.62), q4 = sub(f, 0.62, 0.74), q5 = sub(f, 0.74, 0.92);
+  const x1 = sub(q1, 0, 0.3), sh = ease(sub(q1, 0.25, 0.65)), out = sub(q5, 0, 0.25), chartIn = sub(q5, 0.2, 0.45);
+  const k = 1 - 0.2 * sh, toScr = (x, y) => [8 * sh + x * k, 22 * sh + y * k];
+  // what the classifier learned: green leans toward success, red toward failure, grey carries little weight; it sweeps in left to right
+  const wCol = (wv) => srColor(1 / (1 + Math.exp(-wv * Math.log(0.9 / 0.1) / C.refW)));
+  const learnAmt = (wv, x) => { const s0 = clamp01((x - 40) / 820) * 0.6; return sub(q2, s0, s0 + 0.4) * Math.min(1, Math.abs(wv) / (0.6 * C.refW)); };
+  drawBanner(g, opening, 1 - out);
+  const mg = g.append("g").attr("opacity", x1 * (1 - out)).attr("transform", `translate(${8 * sh},${22 * sh}) scale(${k})`);
+  D.gedges.forEach(e => { const wv = C.wOf(`${e.a}>${e.b}`), a = D.gnode.get(e.a), amt = learnAmt(wv, a.x);
+    drawEdge(mg, e, d3.interpolateRgb(NEU, wCol(wv))(amt), 0.45 + 0.75 * amt, e.nr, 1.2 * amt); });
+  D.gnodes.forEach(nd => { const wv = C.wOf(`s${nd.c}`), amt = learnAmt(wv, nd.x); drawState(mg, nd, 1, 1, d3.interpolateRgb(NEU, wCol(wv))(amt)); });
+  noiseLabel(mg, 0.6);
+  // act 2's last frame dissolves into this map
+  if (x1 < 1) branchScene(g.append("g").attr("opacity", 1 - x1), 1);
+  // the held-out third: a row of tokens whose outcomes are hidden
+  const qy = 402, qx = (i) => 64 + i * 34, slowN = Math.min(3, nH);
+  const win = (i) => i < slowN ? [0.04 + i * 0.24, 0.26 + i * 0.24] : [0.76 + (i - slowN) * 0.012, 0.79 + (i - slowN) * 0.012], local = (i) => sub(q3, ...win(i));
+  const tg = g.append("g").attr("opacity", 1 - out);
+  const qLab = sub(q1, 0.5, 0.7) * (1 - sub(q3, 0.85, 0.95)); if (qLab > 0) halo(tg.append("text").attr("x", qx(0) - 12).attr("y", qy - 20).attr("font-size", 10.5).attr("fill", MUTED).attr("opacity", qLab)).text(`held out: ${nH} rollouts, outcomes hidden`);
+  C.heldOut.forEach((r, i) => { const app = sub(q1, 0.55 + i * 0.015, 0.7 + i * 0.015), gone = i < slowN ? sub(local(i), 0, 0.1) : sub(local(i), 0, 0.3); if (app <= 0 || gone >= 1) return;
+    const tk = tg.append("g").attr("transform", `translate(${qx(i)},${qy})`).attr("opacity", app * (1 - gone));
+    tk.append("rect").attr("x", -11).attr("y", -9).attr("width", 22).attr("height", 18).attr("rx", 9).attr("fill", "#fff").attr("stroke", "#b9b9b3").attr("stroke-width", 1.2);
+    tk.append("text").attr("y", 4).attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", 700).attr("fill", MUTED).text("?"); });
+  // the prediction axis: top = predicted to succeed, bottom = predicted to fail
+  const axIn = sub(q3, 0, 0.05) * (1 - out);
+  if (axIn > 0) { const ag = g.append("g").attr("opacity", axIn);
+    ag.append("line").attr("x1", AX).attr("x2", AX).attr("y1", 92).attr("y2", 376).attr("stroke", "#c9c9c3").attr("stroke-width", 1.5);
+    ag.append("text").attr("x", AX).attr("y", 82).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", INK).attr("font-weight", 700).text("predicted to succeed");
+    ag.append("text").attr("x", AX).attr("y", 392).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", INK).attr("font-weight", 700).text("predicted to fail"); }
+  // each held-out rollout is read along its path; a marker on the axis follows its running score, then settles as a dot
+  const dg = g.append("g").attr("opacity", 1 - out);
+  C.dots.forEach(d => { const i = d.i, r = d.r, l = local(i); if (l <= 0) return; const n = r.n_steps, rt = routeOf(r);
+    if (i < slowN) { const u = sub(l, 0.1, 0.8) * n, settle = ease(sub(l, 0.8, 1)), routeOp = 1 - sub(l, 0.85, 1);
+      if (routeOp > 0 && l < 1) { rt.forEach((e, t) => { if (t + 1 < u) mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2.4).attr("stroke-opacity", 0.85 * routeOp * Math.min(1, u - t - 1)); });
+        const nd = D.gnode.get(r.steps[Math.min(n - 1, Math.max(0, Math.floor(u)))].c);
+        if (l < 0.12) { const [sx, sy] = toScr(nd.x, nd.y), lt = ease(sub(l, 0, 0.1)); bot(g, lerp(qx(i), sx, lt), lerp(qy, sy, lt), 8); }
+        else bot(mg, nd.x, nd.y, 10).attr("opacity", routeOp); }
+      const yRun = C.yS(C.partial(r, Math.max(0.0001, u))), mx = lerp(AX, d.x, settle), my = lerp(yRun, d.y, settle);
+      if (l < 1) { dg.append("line").attr("x1", AX - 16).attr("x2", AX + 16).attr("y1", yRun).attr("y2", yRun).attr("stroke", INK).attr("stroke-width", 1.5).attr("opacity", 0.5 * (1 - settle)); }
+      dg.append("circle").attr("cx", mx).attr("cy", my).attr("r", lerp(7, 5, settle)).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2).attr("opacity", 1 - sub(l, 0.95, 1));
+    } else if (l < 1) { rt.forEach(e => mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.4).attr("stroke-opacity", 0.35 * (1 - l))); } });
+  // placed dots, grey until the outcomes are revealed top to bottom
+  C.dots.forEach(d => { const l = local(d.i), placed = d.i < slowN ? sub(l, 0.95, 1) : sub(l, 0.3, 0.7); if (placed <= 0) return;
+    const rv = sub(q4, clamp01((d.y - 92) / 284) * 0.5, clamp01((d.y - 92) / 284) * 0.5 + 0.35);
+    dg.append("circle").attr("cx", d.x).attr("cy", d.y).attr("r", 5 * (d.i < slowN ? 1 : 0.4 + 0.6 * placed)).attr("fill", d3.interpolateRgb("#c9c9c3", D.pass(d.r) ? PASS : FAIL)(rv)).attr("stroke", "#fff").attr("stroke-width", 1.2).attr("opacity", d.i < slowN ? 1 : placed); });
+  const legendIn = sub(q4, 0.55, 0.85) * (1 - out);
+  if (legendIn > 0) { const lg = g.append("g").attr("opacity", legendIn).attr("transform", `translate(${AX - 62},414)`);
+    [[PASS, "succeeded", 0], [FAIL, "failed", 86]].forEach(([c, t, x]) => { lg.append("circle").attr("cx", x).attr("cy", -4).attr("r", 4.5).attr("fill", c); lg.append("text").attr("x", x + 9).attr("y", 0).attr("font-size", 10.5).attr("fill", INK).text(t); }); }
+  // captions, one per beat
+  const caps = [[sub(q1, 0.6, 0.9) * (1 - sub(q2, 0, 0.1)), `the classifier will learn from the other ${nT} rollouts only`],
+    [sub(q2, 0, 0.1) * (1 - sub(q3, 0, 0.05)), `colour: what a linear classifier over states and transitions learned from those ${nT} · green leans toward success, red toward failure`],
+    [sub(q3, 0, 0.05) * (1 - sub(q4, 0, 0.1)), "it scores each held-out rollout from the states and transitions along its path"],
+    [sub(q4, 0, 0.1) * (1 - out), "each dot is one held-out rollout, placed by its predicted score and coloured by what actually happened"]];
+  caps.forEach(([op, t]) => { if (op > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", op).text(t); });
+  // the paper's Table 1: the best simple per-task classifier, on held-out rollouts of held-out tasks
+  if (chartIn > 0 && RES) { const hg = g.append("g").attr("opacity", chartIn), rows = RES.table1.rows;
+    const bs = ["tau2", "bfclv3", "agentclinic"], ms = ["deepseek", "qwen", "gpt5mini"], x0 = 250, y0 = 104, cw = 186, ch = 84, gap = 8;
+    const col = d3.scaleSequential(d3.interpolateBlues).domain([0.45, 1.02]), best = d3.max(rows, r => r.methods[r.best_baseline][0]);
+    hg.append("text").attr("x", x0).attr("y", 60).attr("font-size", 13).attr("font-weight", 700).attr("fill", INK).text("Simple per-task classifiers, across benchmarks and models");
+    hg.append("text").attr("x", x0).attr("y", 78).attr("font-size", 11).attr("fill", MUTED).text("AUROC on held-out rollouts · best of five classifiers per cell · averaged over each cell's test tasks");
+    ms.forEach((m, j) => hg.append("text").attr("x", x0 + j * (cw + gap) + cw / 2).attr("y", y0 - 8 + 0).attr("dy", 0).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", INK).text(MODEL_L[m]));
+    bs.forEach((bn, i) => hg.append("text").attr("x", x0 - 14).attr("y", y0 + 4 + i * (ch + gap) + ch / 2).attr("text-anchor", "end").attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).text(BENCH_L[bn]));
+    bs.forEach((bn, i) => ms.forEach((m, j) => { const row = rows.find(r => r.benchmark === bn && r.model === m); if (!row) return;
+      const v = row.methods[row.best_baseline][0], cq = ease(sub(q5, 0.3 + (i * 3 + j) * 0.03, 0.5 + (i * 3 + j) * 0.03)), cv = lerp(0.5, v, cq);
+      const cg = hg.append("g").attr("transform", `translate(${x0 + j * (cw + gap)},${y0 + 4 + i * (ch + gap)})`).attr("opacity", 0.3 + 0.7 * sub(cq, 0, 0.2));
+      cg.append("rect").attr("width", cw).attr("height", ch).attr("rx", 8).attr("fill", col(cv));
+      cg.append("text").attr("x", cw / 2).attr("y", ch / 2 + 4).attr("text-anchor", "middle").attr("font-size", 22).attr("font-weight", 800).attr("fill", cv > 0.7 ? "#fff" : INK).text(d3.format(".2f")(cv));
+      cg.append("text").attr("x", cw / 2).attr("y", ch / 2 + 22).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", cv > 0.7 ? "#e8eefc" : MUTED).text(METH_L[row.best_baseline] || row.best_baseline);
+      if (v === best) cg.append("rect").attr("x", -3).attr("y", -3).attr("width", cw + 6).attr("height", ch + 6).attr("rx", 10).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2.5).attr("opacity", sub(q5, 0.8, 0.95)); }));
+    const ly = y0 + 4 + 3 * (ch + gap) + 14, lw = 3 * cw + 2 * gap, lgd = hg.append("g").attr("transform", `translate(${x0},${ly})`), gid = "auroc-scale";
+    const grad = lgd.append("defs").append("linearGradient").attr("id", gid); d3.range(0, 1.01, 0.1).forEach(t => grad.append("stop").attr("offset", `${t * 100}%`).attr("stop-color", col(0.5 + 0.5 * t)));
+    lgd.append("rect").attr("width", lw).attr("height", 6).attr("rx", 3).attr("fill", `url(#${gid})`);
+    lgd.append("text").attr("x", 0).attr("y", 20).attr("font-size", 10).attr("fill", MUTED).text("0.5 · chance");
+    lgd.append("text").attr("x", lw).attr("y", 20).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text("1.0 · every success ranked above every failure"); }
+}
+
 // ---------- beats ----------
 const beats = {
   a1(svg, f) { attemptScene(svg, f); },
   a2(svg, f) { branchScene(svg, f); },
+  a3(svg, f) { findingScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");

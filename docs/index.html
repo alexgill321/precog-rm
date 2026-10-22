@@ -69,16 +69,25 @@
   <section class="beat" data-scene="a2" data-f0="0.95" data-f1="1.0" data-secs="3" data-hold="4">
     <div class="card"><p class="big">We hypothesize that treating an agent’s rollouts on a task as a map of its behavior reveals which actions and observations predict how a rollout will end.</p></div>
   </section>
-  <section class="beat head wide" data-scene="act3" data-f0="0" data-f1="1" data-secs="9" data-hold="3">
-    <div class="card"><p class="act-n">3</p><h2>The finding.</h2>
-<div class="num" data-n="0.95" data-fmt="dec">0</div><p class="numlabel">AUROC, best per-task classifier, held-out rollouts</p>
-      <p>Fit a nearest-centroid or an RBF classifier on one task's rollouts, or a fastText model on its state sequences, and it predicts the outcomes of rollouts it has not seen. Across three benchmarks and three policies.</p>
-      <p class="lands">Successes and failures separate along the path.</p>
-      <div class="controls small"><label><input type="radio" name="t1" value="best" checked> best per-task classifier</label><label><input type="radio" name="t1" value="PN"> Precog-RM</label></div>
-      <div id="table1" class="chart"></div>
-      <button class="inside" data-panel="flow">Look inside: the state map of one task</button>
-      <p class="hinge">Every task, though, needs its own classifier. ↓</p>
-    </div>
+  <section class="beat head" data-scene="a3" data-f0="0" data-f1="0.1" data-secs="5" data-hold="2.5">
+    <div class="card"><p class="act-n">3</p><h2>The finding</h2><p>To test this, we hide the outcomes of a third of the rollouts.</p></div>
+  </section>
+  <section class="beat" data-scene="a3" data-f0="0.1" data-f1="0.25" data-secs="5" data-hold="2.5">
+    <div class="card"><p>A simple classifier, fit on the remaining rollouts, learns which states and transitions lean toward success or failure.</p></div>
+  </section>
+  <section class="beat" data-scene="a3" data-f0="0.25" data-f1="0.62" data-secs="11" data-hold="2.5">
+    <div class="card"><p>It then reads each hidden rollout’s path through the map and predicts how it will end.</p></div>
+  </section>
+  <section class="beat" data-scene="a3" data-f0="0.62" data-f1="0.74" data-secs="4" data-hold="3">
+    <div class="card"><p>When the outcomes are revealed, the rollouts that succeeded mostly rank above the ones that failed.</p></div>
+  </section>
+  <section class="beat" data-scene="a3" data-f0="0.74" data-f1="0.92" data-secs="7" data-hold="3">
+    <div class="card"><p>Across three benchmarks and three models, simple classifiers fit on each task’s own rollouts predict held-out outcomes at up to</p>
+      <div class="num" data-n="0.95" data-fmt="dec">0</div><p class="numlabel">AUROC: how often a held-out success is ranked above a held-out failure</p></div>
+  </section>
+  <section class="beat" data-scene="a3" data-f0="0.92" data-f1="1.0" data-secs="3" data-hold="4">
+    <div class="card"><p class="big">Successes and failures separate: the outcome can be read from the actions and observations alone.</p>
+      <button class="inside" data-panel="flow">Look inside: the state map of one task</button></div>
   </section>
   <section class="beat head wide" data-scene="act4" data-f0="0" data-f1="1" data-secs="10" data-hold="3">
     <div class="card"><p class="act-n">4</p><h2>The obstacle.</h2>
@@ -179,8 +188,8 @@
 <script src="app.js?v=11"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=22"></script>
+<script src="opening.js?v=26"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=5"></script>
+<script src="stage.js?v=6"></script>
 </body>
 </html>

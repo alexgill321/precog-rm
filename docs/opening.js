@@ -180,12 +180,50 @@ function drawBanner(g, opening, op = 1) { const ban = g.append("g").attr("opacit
 function branchScene(svg, f) {
   const g = svg.append("g"), F = D.pairFP.f, Pr = D.pairFP.p, n = F.n_steps, N = D.rolls.length, kR = D.prefix.k;
   const K = 860 / (n + 1), sxT = (i) => 20 + (i + 0.55) * K, cyT = 196, cwT = 0.84 * K, pillT = Math.min(cwT / 1.5, Math.max(26, cwT * 0.6) / 2.9) * 0.92;
-  const iF = D.rolls.indexOf(F), laneY = (i) => 66 + i * (350 / (N - 1)), LP = 2.3, cap = (r) => Math.min(n, r.n_steps), opening = F.opening || "";
+  const laneY = (i) => 66 + i * (350 / (N - 1)), cap = (r) => Math.min(n, r.n_steps), opening = F.opening || "", icF = D.ic(F);
   const edgePath = (a, b) => `M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`, nodeR = (nd) => 5 + Math.sqrt(nd.n) * 2.2;
   const halo = (t) => t.attr("stroke", "#f7f7f5").attr("stroke-width", 4).attr("paint-order", "stroke");
   const lanePills = (gg, r, y, size, op, upto) => { const c = cap(r), icons = D.ic(r);
     gg.append("line").attr("x1", sxT(0)).attr("x2", sxT(c - 1)).attr("y1", y).attr("y2", y).attr("stroke", "#e3e3df").attr("opacity", op * 0.8);
     for (let t = 0; t < Math.min(c, upto); t++) pair(gg, sxT(t), y, icons[t][0], icons[t][1], size, op); };
+  // fifty attempts: the attempt from before is lane 1; lanes show the first S steps as action|observation chips
+  const S12 = D.S, L0 = 132, L1 = 700, xL = (t) => L0 + t * (L1 - L0) / (S12 - 1), capL = (r) => Math.min(S12, r.n_steps);
+  const order = [F, ...D.rolls.filter(r => r !== F)], laneOf = new Map(order.map((r, i) => [r, i])), gateX = 66, gateY = 241;
+  const chip = (gg, x, y, op) => { if (op <= 0.01) return; gg.append("rect").attr("x", x - 5.6).attr("y", y - 2.5).attr("width", 5.2).attr("height", 5).attr("rx", 1).attr("fill", "#7d9fe0").attr("opacity", op);
+    gg.append("rect").attr("x", x + 0.4).attr("y", y - 2.5).attr("width", 5.2).attr("height", 5).attr("rx", 1).attr("fill", "#e0a95a").attr("opacity", op); };
+  const nodePos = (r, i, t) => { const nd = D.node(t, r.steps[t].c); return [nd.x + (hash(i, t, 5) - 0.5) * 6, nd.y + (hash(i, t, 9) - 0.5) * 6]; };
+  const laneWin = (i) => i <= 3 ? [0.15 + (i - 1) * 0.1, 0.25 + (i - 1) * 0.1] : [0.45 + (i - 4) * 0.0035, 0.70 + (i - 4) * 0.0025];
+  function lanes(gg, q, kitOp, laneOp, snap = 0) {
+    const m = ease(sub(q, 0, 0.15)); let started = 0, ok = 0, bad = 0;
+    if (m < 1) { for (let t = 0; t < n; t++) { const x = lerp(sxT(t), t < S12 ? xL(t) : sxT(t), m), y = lerp(cyT, laneY(0), m);
+        pair(gg, x, y, icF[t][0], icF[t][1], lerp(pillT, 2.4, m), 1 - m); if (t < S12) chip(gg, x, y, m); }
+      outcome(gg, lerp(sxT(n - 1) + 44.5, xL(capL(F) - 1) + 14, m), lerp(cyT, laneY(0), m), D.pass(F), lerp(18, 7, m)); }
+    order.forEach((r, i) => { const lp = i === 0 ? (m >= 1 ? 1 : 0) : sub(q, ...laneWin(i)); if (i > 0 && lp <= 0) return; started++;
+      const c = capL(r), y = laneY(i), upto = lp * c, fanOp = 0.16 * kitOp * Math.min(1, (i === 0 ? m : lp) * 4);
+      if (fanOp > 0) gg.append("line").attr("x1", gateX + 17).attr("y1", gateY).attr("x2", L0 - 12).attr("y2", y).attr("stroke", INK).attr("stroke-width", 0.8).attr("opacity", fanOp);
+      if (i === 0 && m < 1) { if (!D.pass(r)) bad++; else ok++; return; }
+      gg.append("line").attr("x1", xL(0)).attr("x2", xL(c - 1)).attr("y1", y).attr("y2", y).attr("stroke", "#e3e3df").attr("opacity", 0.8 * laneOp * (1 - snap));
+      for (let t = 0; t < c; t++) { const a = i === 0 ? 1 : sub(upto, t, t + 0.5); if (a <= 0) continue;
+        const [x, yy] = snap > 0 ? (() => { const [nx, ny] = nodePos(r, i, t); return [lerp(xL(t), nx, snap), lerp(y, ny, snap)]; })() : [xL(t), y];
+        chip(gg, x, yy, a * laneOp * (1 - 0.85 * snap)); }
+      if (i > 0 && lp < 1) { const tx = xL(Math.min(c - 1, upto)); if (i <= 3) bot(gg, tx + 9, y, 6).attr("opacity", laneOp); else gg.append("circle").attr("cx", tx + 7).attr("cy", y).attr("r", 1.8).attr("fill", INK).attr("opacity", laneOp); }
+      if (lp >= 1) { outcome(gg, xL(c - 1) + 14, y, D.pass(r), 7, laneOp * (1 - snap)); if (D.pass(r)) ok++; else bad++; } });
+    const k = kitOp * m; if (k <= 0) return;
+    const kit = gg.append("g").attr("opacity", k);
+    kit.append("circle").attr("cx", gateX).attr("cy", gateY).attr("r", 30).attr("fill", "#fff").attr("stroke", "#c9c9c3");
+    icon(kit, "clipboard-list", gateX - 9, gateY - 8, 13, INK); icon(kit, "bot", gateX + 8, gateY - 8, 13, INK);
+    kit.append("text").attr("x", gateX).attr("y", gateY + 14).attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", 800).attr("fill", INK).text("× 50");
+    kit.append("text").attr("x", gateX).attr("y", gateY + 46).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("same task");
+    kit.append("text").attr("x", gateX).attr("y", gateY + 59).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("same agent");
+    kit.append("rect").attr("x", xL(0) - 9).attr("y", laneY(0) - 5).attr("width", xL(capL(F) - 1) - xL(0) + 32).attr("height", 10).attr("rx", 5).attr("fill", "none").attr("stroke", FAIL).attr("stroke-width", 1.2);
+    halo(kit.append("text").attr("x", xL(capL(F) - 1) + 30).attr("y", laneY(0) + 3.5).attr("font-size", 9.5).attr("fill", FAIL)).text("attempt 1 · the one from before");
+    const box = kit.append("g").attr("transform", "translate(730,92)");
+    box.append("rect").attr("width", 150).attr("height", 70).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
+    box.append("text").attr("x", 14).attr("y", 24).attr("font-size", 13).attr("font-weight", 800).attr("fill", INK).text(`attempt ${started} / ${N}`);
+    icon(box, "circle-check", 22, 48, 14, PASS); box.append("text").attr("x", 34).attr("y", 52).attr("font-size", 13).attr("font-weight", 700).attr("fill", PASS).text(ok);
+    icon(box, "circle-x", 76, 48, 14, FAIL); box.append("text").attr("x", 88).attr("y", 52).attr("font-size", 13).attr("font-weight", 700).attr("fill", FAIL).text(bad);
+    kit.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", sub(q, 0.85, 1)).text(`${N} attempts · same task · same agent · first ${S12} steps shown`);
+  }
   // completions resampled from the same prefix: the successful rollout first, then the others that share the prefix
   const rowsY = [118, 274, 314, 354, 394, 157, 78];
   const comps = [Pr, ...D.prefix.rolls.filter(r => r !== F && r !== Pr)].slice(0, rowsY.length).map((r, i) => ({ r, y: rowsY[i] }));
@@ -227,18 +265,13 @@ function branchScene(svg, f) {
     return;
   }
   drawBanner(g, opening);
-  // ---- beat 5: the few dozen rollouts we can afford
-  if (f < 0.60) { const q = sub(f, 0.48, 0.60), e1 = ease(sub(q, 0, 0.4)), yF = lerp(cyT, laneY(iF), e1);
-    lanePills(g, F, yF, lerp(pillT, LP, e1), 1, n); outcome(g, sxT(n - 1) + lerp(44.5, 10, e1), yF, false, lerp(18, 7, e1));
-    D.rolls.forEach((r, j) => { if (r === F) return; const lj = sub(q, 0.3 + j * 0.006, 0.66 + j * 0.006); if (lj <= 0) return; const c = cap(r), upto = Math.floor(lj * (c + 0.999));
-      lanePills(g, r, laneY(j), LP, Math.min(1, lj * 3), upto); if (upto >= c) outcome(g, sxT(c - 1) + 10, laneY(j), D.pass(r), 7); });
-    g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", sub(q, 0.7, 1)).text(`${N} independent rollouts of the same task`);
-    return; }
+  // ---- beat 5: fifty attempts from the same gate: attempt 1 settles, attempts 2-4 run visibly, the rest fan out
+  if (f < 0.60) { lanes(g, sub(f, 0.48, 0.60), 1, 1, 0); return; }
   // ---- beats 6-7: a pair of near-identical steps lifts out of the lanes; then all steps snap into shared states
   const sp = D.simPair, q6 = sub(f, 0.60, 0.70), q7 = sub(f, 0.70, 0.84);
   const lift = f < 0.70 ? ease(sub(q6, 0.2, 0.6)) : 1 - ease(sub(q7, 0, 0.2)), mark = f < 0.70 ? sub(q6, 0, 0.2) : 1 - sub(q7, 0, 0.2);
   const cardsIn = f < 0.70 ? sub(q6, 0.45, 0.75) : 1 - sub(q7, 0, 0.12);
-  const drawCard = (r, x0, y0, w, h, label) => { const t = sp.t, j = D.rolls.indexOf(r), px = sxT(t), py = laneY(j);
+  const drawCard = (r, x0, y0, w, h, label) => { const t = sp.t, px = xL(t), py = laneY(laneOf.get(r));
     const cg = g.append("g").attr("transform", `translate(${lerp(px, x0, lift)},${lerp(py, y0, lift)}) scale(${lerp(0.03, 1, lift)})`).attr("opacity", Math.min(1, lift * 1.5));
     cg.append("rect").attr("width", w).attr("height", h).attr("rx", 12).attr("fill", "#fff").attr("stroke", "#c9c9c3").attr("stroke-width", 1.4);
     cg.append("text").attr("x", 16).attr("y", 22).attr("font-size", 10.5).attr("letter-spacing", 1.2).attr("fill", MUTED).text(`${label} · STEP ${t + 1}`);
@@ -247,14 +280,11 @@ function branchScene(svg, f) {
       textBlock(cg, 22, yy + 35, wrapText(text, cpl), 11.5, INK, ml, false); };
     sec(32, ACT_BG, ACT, "ACTION", actText(r.steps[t].a), 4); sec(32 + half, OBS_BG, OBS, "OBSERVATION", obsText(r.steps[t].o), 3); };
   if (f < 0.84) {
-    const snap = f < 0.70 ? 0 : ease(sub(q7, 0.2, 0.62)), routes = f < 0.70 ? 0 : sub(q7, 0.58, 1), laneOp = 1 - 0.75 * lift;
+    const snap = f < 0.70 ? 0 : ease(sub(q7, 0.2, 0.62)), routes = f < 0.70 ? 0 : sub(q7, 0.58, 1), laneOp = 1 - 0.75 * lift, kitOp = f < 0.70 ? 1 - sub(q6, 0, 0.2) : 0;
     if (routes > 0) [...D.edges.values()].forEach(e => { const a = D.node(e.t, e.a), b = D.node(e.t + 1, e.b); g.append("path").attr("d", edgePath(a, b)).attr("fill", "none").attr("stroke", srColor(e.np / e.n)).attr("stroke-width", 0.8 + Math.sqrt(e.n) * 1.2).attr("stroke-opacity", 0.55 * routes); });
-    if (sp && mark > 0) g.append("rect").attr("x", sxT(sp.t) - 11).attr("y", 58).attr("width", 22).attr("height", 366).attr("rx", 8).attr("fill", ACT).attr("opacity", 0.08 * mark);
-    D.rolls.forEach((r, j) => { const icons = D.ic(r), c = cap(r);
-      for (let t = 0; t < c; t++) { if (t < D.S) { const nd = D.node(t, r.steps[t].c); pair(g, lerp(sxT(t), nd.x + (hash(j, t, 5) - 0.5) * 6, snap), lerp(laneY(j), nd.y + (hash(j, t, 9) - 0.5) * 6, snap), icons[t][0], icons[t][1], LP, laneOp * (1 - 0.85 * snap)); }
-        else if (snap < 1) pair(g, sxT(t), laneY(j), icons[t][0], icons[t][1], LP, laneOp * (1 - snap)); }
-      if (snap < 1) outcome(g, sxT(c - 1) + 10, laneY(j), D.pass(r), 7, laneOp * (1 - snap)); });
-    if (sp && mark > 0) [sp.a, sp.b].forEach(r => g.append("circle").attr("cx", sxT(sp.t)).attr("cy", laneY(D.rolls.indexOf(r))).attr("r", 6).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.6).attr("opacity", mark));
+    if (sp && mark > 0) g.append("rect").attr("x", xL(sp.t) - 11).attr("y", 58).attr("width", 22).attr("height", 366).attr("rx", 8).attr("fill", ACT).attr("opacity", 0.08 * mark);
+    lanes(g, 1, kitOp, laneOp, snap);
+    if (sp && mark > 0) [sp.a, sp.b].forEach(r => g.append("circle").attr("cx", xL(sp.t)).attr("cy", laneY(laneOf.get(r))).attr("r", 6).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.6).attr("opacity", mark));
     if (snap > 0) D.cols.forEach(col => col.nodes.forEach(nd => g.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nodeR(nd) * snap).attr("fill", "#fff").attr("fill-opacity", snap).attr("stroke", D.noise.get(nd.c) ? NOISE_STROKE : srColor(D.sr.get(nd.c))).attr("stroke-width", 3).attr("stroke-dasharray", D.noise.get(nd.c) ? "3,2" : null).attr("opacity", snap)));
     if (sp && lift > 0) { drawCard(sp.a, 40, 70, 390, 270, "ROLLOUT A"); drawCard(sp.b, 470, 70, 390, 270, "ROLLOUT B");
       const bg = g.append("g").attr("opacity", cardsIn); bg.append("path").attr("d", "M235,66 V56 H665 V66").attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 1.6);

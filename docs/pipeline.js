@@ -105,7 +105,7 @@ function buildScene(b) {
   const laneY = (i) => 46 + i * (344 / (LANES - 1));
   const focus = trains[0];
   const focusSteps = focus.steps.slice(0, INTRO_STEPS).map(s => ({ ai: actionIcon(s.a), at: actionText(s.a), oi: obsIcon(s.o), ot: obsText(s.o) }));
-  return { rolls, pass, supIds, sup, trains, stations, stPos, routes, latent, protoP: L(proj(cp)), protoF: L(proj(cf)),
+  return { bundle: b, rolls, pass, supIds, sup, trains, stations, stPos, routes, latent, protoP: L(proj(cp)), protoF: L(proj(cf)),
            hullP: hull(sup.filter(r => pass.get(r.rid)).map(r => r.rid)), hullF: hull(sup.filter(r => !pass.get(r.rid)).map(r => r.rid)),
            query: best, trails, thr, sr, noise, xs, icons, obs, laneY, focus, focusSteps, focusCol: focusCol < 0 ? 3 : focusCol, score,
            gloss: TASK_GLOSS[b.task_id] || `${b.benchmark} · task ${b.task_id}` };
@@ -115,7 +115,8 @@ function beatAt(p) { for (let i = 0; i < BEATS.length; i++) if (p < BEATS[i].t1 
 const sub = (q, a, b) => clamp01((q - a) / (b - a));
 
 function render(p) { if (!scene) return; renderScene(document.querySelector("#pipeline"), scene, p, true); }
-function renderScene(svgNode, S, p, captions = false) {
+// opts.noIntro: skip the old per-step station map and draw only the model (the scrollytelling acts bring their own map)
+function renderScene(svgNode, S, p, captions = false, opts = {}) {
   if (!svgNode || !S) return;
   const svg = d3.select(svgNode); svg.selectAll("*").remove(); if (svgNode.tagName === "svg") svg.attr("viewBox", `0 0 ${W} ${H}`);
   const [bi, q] = beatAt(p), g = svg.append("g");
@@ -127,6 +128,7 @@ function renderScene(svgNode, S, p, captions = false) {
   const runOne = bi < 2 ? 0 : bi === 2 ? sub(q, 0.58, 0.76) : 1;                          // one rollout travels its route
   const runAll = bi < 2 ? 0 : bi === 2 ? sub(q, 0.8, 1) : 1;                              // the others follow
   const fadeOut = bi < 3 ? 0 : bi === 3 ? ease(sub(q, 0, 0.12)) : 1;                       // station map -> model
+  if (opts.noIntro) { if (bi >= 3) drawModel(g, S, bi, q, 1); return; }
   if (bi <= 2) drawIntro(g, S, bi, q, zoom, group1, group);
   if (bi >= 2 && fadeOut < 1) {                                                              // stations
     const st = g.append("g").attr("opacity", 1 - fadeOut);
@@ -199,7 +201,7 @@ function camera(rect) { const [x, y, w, h] = rect, k = Math.min(W / w, H / h); r
 const camLerp = (a, b, t) => ({ k: lerp(a.k, b.k, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t) });
 
 function drawModel(gRoot, S, bi, q, fadeIn) {
-  const Bd = window.PRECOG_BUNDLE, idxOf = (rid) => Bd.rollouts.findIndex(r => r.rid === rid);
+  const Bd = S.bundle || window.PRECOG_BUNDLE, idxOf = (rid) => Bd.rollouts.findIndex(r => r.rid === rid);
   const defs = gRoot.append("defs");
   [["inEmb", ST.embX, ST.embW], ["inPrj", ST.prjX, ST.prjW], ["inEnc", ST.encX, ST.encW], ["inPool", ST.poolX, ST.poolW]].forEach(([n, x, w]) =>
     defs.append("clipPath").attr("id", `clip-${n}`).append("rect").attr("x", 1).attr("y", 1).attr("width", w - 2).attr("height", ST.h - 2).attr("rx", 11));

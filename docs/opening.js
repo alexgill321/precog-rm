@@ -554,6 +554,18 @@ function obstacleScene(svg, f) {
   caps.forEach(([op, t]) => { if (op > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", op).text(t); });
 }
 
+// ---------- the idea (act 5): Precog-RM, run on act 4's new task ----------
+// The model scene from pipeline.js (architecture tour, one rollout's point settling, sixteen labeled rollouts becoming two
+// prototypes), drawn for the second task when it is loaded: a task the encoder never trained on. Act 4's last frame dissolves into it.
+function modelScene(svg, f) {
+  const g = svg.append("g"), P = window.PrecogPipeline; if (!P) return;
+  const S = (D2 && (D2.S || (D2.S = P.buildScene(D2.b)))) || P.scene; if (!S) return;
+  // act 4's last frame fades out first, then the model fades in, so the two never sit on top of each other
+  const outA4 = sub(f, 0, 0.025), inM = sub(f, 0.02, 0.05), mg = g.append("g").attr("opacity", inM);
+  P.renderScene(mg.append("g").node(), S, 0.38 + 0.40 * f, false, { noIntro: true });
+  if (outA4 < 1) obstacleScene(g.append("g").attr("opacity", 1 - outA4), 1);
+}
+
 // ---------- the state-map panel (act 3's "look inside"): any task's global state graph, coloured by outcome ----------
 const graphCache = new WeakMap();
 function graphOf(b) { if (!graphCache.has(b)) graphCache.set(b, buildGraph(b.rollouts, (r) => r.reward >= 0.5, new Map(b.clusters.map(c => [c.id, c.noise])))); return graphCache.get(b); }
@@ -583,6 +595,7 @@ const beats = {
   a2(svg, f) { branchScene(svg, f); },
   a3(svg, f) { findingScene(svg, f); },
   a4(svg, f) { obstacleScene(svg, f); },
+  a5(svg, f) { modelScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");

@@ -46,7 +46,7 @@ Acts 0, 2, 4 and 5 may carry a second paragraph of three or four sentences, in t
 
 ## Where things live
 
-- `docs/opening.js` — acts 1–4 (scenes a1–a4), computed from the loaded task bundle; acts 3 and 4 read their charts from `docs/results.json`, and act 4 fetches a second task of the same agent (same domain if possible) through the page index.
+- `docs/opening.js` — acts 1–5 (scenes a1–a5; act 5 runs pipeline.js's model scene on act 4's second task), computed from the loaded task bundle; acts 3 and 4 read their charts from `docs/results.json`, and act 4 fetches a second task of the same agent (same domain if possible) through the page index.
 - `docs/pipeline.js` — the model scene; `story.js` renders slices of its timeline as loops.
 - `docs/story.js` — loop manager, GRPO loop, panel redraws, rail.
 - `docs/charts.js` + `docs/results.json` — result figures from the shipped results (`scripts/build_web_results.py`).

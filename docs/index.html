@@ -102,15 +102,28 @@
   <section class="beat" data-scene="a4" data-f0="0.86" data-f1="1.0" data-secs="3" data-hold="4">
     <div class="card"><p class="big">So instead of fitting a classifier to each task, we learn the representation itself, across many tasks.</p></div>
   </section>
-  <section class="beat head wide" data-scene="act5" data-f0="0" data-f1="1" data-secs="40" data-hold="3">
-    <div class="card"><p class="act-n">5</p><h2>The idea.</h2>
-<div class="num" data-n="128" data-fmt="int">0</div><p class="numlabel">dimensions per rollout, or any prefix of it</p>
-      <p>Precog-RM embeds each action and observation, projects them, and reads the whole sequence with a small transformer; mean pooling gives one point. It is meta-learned across many tasks and policies so that rollouts heading the same way land near each other.</p>
-      <p>On a new task, one batch of labeled rollouts becomes two prototypes, the mean of its passes and the mean of its failures. A rollout is scored by distance to them. Nothing is fitted at inference.</p>
-      <p class="lands">A rollout becomes a point; a batch becomes two prototypes.</p>
-      <button class="inside" data-panel="latent">Look inside: the latent space, your support set</button>
-      <p class="hinge">How few rollouts? How far does it carry? ↓</p>
-    </div>
+  <section class="beat head" data-scene="a5" data-f0="0" data-f1="0.056" data-secs="3" data-hold="2.5">
+    <div class="card"><p class="act-n">5</p><h2>Precog-RM</h2><p>Precog-RM learns that representation: one model, trained across many tasks and agents, that turns a rollout into a single point.</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="0.056" data-f1="0.224" data-secs="7" data-hold="2.5">
+    <div class="card"><p>Each <b class="a">action</b> and <b class="o">observation</b> is embedded by a frozen text encoder, then projected into a smaller space.</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="0.224" data-f1="0.336" data-secs="4.5" data-hold="2.5">
+    <div class="card"><p>A small transformer reads the steps together, so each one is seen in the context of the rest of the rollout.</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="0.336" data-f1="0.385" data-secs="2.5" data-hold="3">
+    <div class="card"><p>Averaging its outputs gives one point for the whole rollout, or for any prefix of it:</p>
+      <div class="num" data-n="128" data-fmt="int">0</div><p class="numlabel">dimensions</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="0.385" data-f1="0.7" data-secs="9" data-hold="2.5">
+    <div class="card"><p>As the rollout unfolds, its point moves through this space and settles as steps arrive.</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="0.7" data-f1="1.0" data-secs="9" data-hold="3">
+    <div class="card"><p>On a new task, one labeled batch of rollouts gives two prototypes: the average point of its successes and of its failures. A rollout is scored by which one it lies closer to, with nothing fitted.</p></div>
+  </section>
+  <section class="beat" data-scene="a5" data-f0="1.0" data-f1="1.0" data-secs="1" data-hold="4">
+    <div class="card"><p class="big">Where text embeddings relate steps by what they say, Precog-RM relates whole rollouts by how they end.</p>
+      <button class="inside" data-panel="latent">Look inside: the latent space, your support set</button></div>
   </section>
   <section class="beat head wide" data-scene="act6" data-f0="0" data-f1="1" data-secs="16" data-hold="3">
     <div class="card"><p class="act-n">6</p><h2>The proof.</h2>
@@ -192,9 +205,9 @@
 <script src="icons.js?v=2"></script>
 <script src="app.js?v=15"></script>
 <script src="charts.js?v=8"></script>
-<script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=31"></script>
+<script src="pipeline.js?v=33"></script>
+<script src="opening.js?v=33"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=7"></script>
+<script src="stage.js?v=8"></script>
 </body>
 </html>

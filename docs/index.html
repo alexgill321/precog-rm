@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
 <meta name="description" content="Precog-RM: an outcome-predictive representation of LLM agent trajectories, told as a story on one task.">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body class="scrolly">
@@ -174,8 +174,10 @@
   </div>
   <div class="drawer-panel" data-panel="latent">
     <h3>The latent space, your support set</h3>
+    <div class="controls small"><label>Benchmark <select id="lat-benchmark"></select></label><label>Policy <select id="lat-policy"></select></label><label>Task <select id="lat-task"></select></label></div>
     <div class="controls small"><label>Encoder <select id="sel-encoder"></select></label>
-      <label>Support set <select id="sel-support"><option value="cv0">3-fold CV: fold 1 held out</option><option value="cv1">3-fold CV: fold 2 held out</option><option value="cv2">3-fold CV: fold 3 held out</option><option value="k1">k=1 per class</option><option value="k2">k=2 per class</option><option value="k4">k=4 per class</option><option value="k8">k=8 per class</option><option value="custom">custom</option></select></label>
+      <label>Support set <select id="sel-support"><option value="k1">k=1 per class, random draw</option><option value="k2">k=2 per class, random draw</option><option value="k4">k=4 per class, random draw</option><option value="k8" selected>k=8 per class, random draw</option><option value="cv0">3-fold CV: fold 1 held out</option><option value="cv1">3-fold CV: fold 2 held out</option><option value="cv2">3-fold CV: fold 3 held out</option><option value="custom">custom</option></select></label>
+      <button id="redraw" type="button" class="redraw">new draw</button>
       <label>k <input id="k-slider" type="range" min="0" max="3" value="3"> <span id="k-val">8</span></label><span id="score-badges" class="badges"></span></div>
     <p class="hint">Click a rollout to select it; shift-click to move it in or out of the support set.</p>
     <div class="split"><div class="grow"><svg id="latent"></svg></div><aside class="panel"><svg id="strip"></svg><div id="auroc-table"></div></aside></div>
@@ -203,7 +205,7 @@
 </div>
 
 <script src="icons.js?v=2"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=33"></script>
 <script src="opening.js?v=35"></script>

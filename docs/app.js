@@ -12,9 +12,11 @@ const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
 const fmt = d3.format(".2f"), fmt3 = d3.format(".3f");
 
 let INDEX = null, B = null;                      // index, current bundle
+let SB = null;                                    // the bundle behind the latent-space and step-by-step panels
+const SCORING_DEFAULT = { benchmark: "tau2", policy: "deepseek-v3.2", task: "retail_74" };   // a held-out task where more support clearly helps
 let MB = null, mapSel = null, mapFollowsPage = true;   // the state-map panel's own bundle and selected state
 const mapCache = new Map();
-let S = { encoder: "prefix", preset: "cv0", support: new Set(), sel: null, t: 1 };
+let S = { encoder: "prefix", preset: "k8", draw: 0, support: new Set(), sel: null, t: 1 };
 
 // ---------- loading ----------
 async function init() {
@@ -25,7 +27,7 @@ async function init() {
   $("#sel-policy").onchange = () => { refreshTasks(); loadSelected(); };
   $("#sel-task").onchange = loadSelected;
   refreshPolicies();
-  initMapSelectors();
+  initMapSelectors(); initLatSelectors();
   if ($("#n-bundled")) $("#n-bundled").textContent = INDEX.tasks.length;
   // the scenes fetch a second task (act 4) through this
   window.PrecogData = { index: INDEX, url: (t) => `${DATA_BASE}/${t.benchmark}/${t.policy}/${t.task}.json?v=${DATA_V}` };
@@ -63,22 +65,17 @@ async function loadSelected() {
   ].join("");
   const setN = (id, items) => { const el = $(id); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
   setN("#n1", [[B.n_rollouts, "rollouts of " + B.task_id], [B.clusters.length, "behavior states (incl. outlier bin)"], [`${Math.round(B.success_rate * 100)}%`, "success rate"], [maxT, "longest rollout, in steps"]]);
-  const ENC_LABEL = { prefix: "Precog-RM, prefix-trained (deployed in GRPO)", full: "Precog-RM, generalist, full rollouts only", raw: "raw action–observation space, no learning (nearest centroid)" };
-  const encSel = $("#sel-encoder"); encSel.innerHTML = ""; ["prefix", "full", "raw"].filter(k => B.encoders[k]).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = ENC_LABEL[k]; encSel.appendChild(o); });
-  if (!B.encoders[S.encoder]) S.encoder = Object.keys(B.encoders)[0]; encSel.value = S.encoder;
-  S.thr = B.stop_threshold; $("#theta").value = S.thr; $("#theta-val").textContent = S.thr.toFixed(2);
-  S.sel = null; applyPreset();
-  drawScoring();
   window.PRECOG_BUNDLE = B;
   document.dispatchEvent(new CustomEvent("precog:bundle", { detail: B }));
   if (mapFollowsPage) { setMapTo(B.benchmark, B.policy, B.task); loadMap(); }
 }
 $("#sel-encoder").onchange = (e) => { S.encoder = e.target.value; drawScoring(); };
 $("#sel-support").onchange = (e) => { S.preset = e.target.value; applyPreset(); drawScoring(); };
+if ($("#redraw")) $("#redraw").onclick = () => { S.draw = (S.draw || 0) + 1; applyPreset(); drawScoring(); };
 $("#prefix-t").oninput = (e) => { S.t = +e.target.value; drawScoring(false); };
 if ($("#theta")) $("#theta").oninput = (e) => { S.thr = +e.target.value; $("#theta-val").textContent = S.thr.toFixed(2); drawScoring(false); };
 document.addEventListener("precog:k", (e) => { S.preset = `k${e.detail}`; $("#sel-support").value = S.preset; applyPreset(); drawScoring(); });
-window.addEventListener("resize", () => { if (B) drawScoring(false); });
+window.addEventListener("resize", () => { if (SB) drawScoring(false); });
 
 // ---------- 1. the state map of one task (act 3's "look inside"): its own benchmark / policy / task selection ----------
 const BENCH_L = { tau2: "Tau2-Bench", bfclv3: "BFCLv3", agentclinic: "AgentClinic" };
@@ -124,16 +121,47 @@ function showState(c) {
 }
 const esc = (s) => s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
 
-// ---------- 2. latent-space scoring ----------
-function applyPreset() {
-  const rids = B.rollouts.map(r => r.rid);
-  if (S.preset.startsWith("cv")) { const held = new Set(B.cv_folds[+S.preset[2]]); S.support = new Set(rids.filter(r => !held.has(r))); }
-  else if (S.preset.startsWith("k")) { const k = +S.preset.slice(1), held = new Set(B.cv_folds[0]), pass = new Map(B.rollouts.map(r => [r.rid, r.reward >= 0.5]));
-    const train = rids.filter(r => !held.has(r)); S.support = new Set([...train.filter(r => pass.get(r)).slice(0, k), ...train.filter(r => !pass.get(r)).slice(0, k)]); }
-  // custom: keep as is
-  if (S.sel == null || S.support.has(S.sel)) S.sel = rids.find(r => !S.support.has(r)) ?? rids[0];
+// ---------- 2. latent-space scoring: its own benchmark / policy / task selection, shared with the step-by-step panel ----------
+function initLatSelectors() {
+  if (!$("#lat-benchmark")) return;
+  const bms = [...new Set(INDEX.tasks.map(t => t.benchmark))];
+  fill($("#lat-benchmark"), bms, bms.map(b => BENCH_L[b] || b));
+  const pols = () => { const bm = $("#lat-benchmark").value; fill($("#lat-policy"), [...new Set(INDEX.tasks.filter(t => t.benchmark === bm).map(t => t.policy))]); tasks(); };
+  const tasks = () => { const bm = $("#lat-benchmark").value, pol = $("#lat-policy").value, ts = INDEX.tasks.filter(t => t.benchmark === bm && t.policy === pol);
+    fill($("#lat-task"), ts.map(t => t.task), ts.map(t => `${t.task_id}  (success ${Math.round(t.success_rate * 100)}%)${t.held_out ? "" : " · training task"}`)); };
+  $("#lat-benchmark").onchange = () => { pols(); loadScoring(); }; $("#lat-policy").onchange = () => { tasks(); loadScoring(); }; $("#lat-task").onchange = loadScoring;
+  const d = INDEX.tasks.find(t => t.benchmark === SCORING_DEFAULT.benchmark && t.policy === SCORING_DEFAULT.policy && t.task === SCORING_DEFAULT.task) || INDEX.tasks[0];
+  $("#lat-benchmark").value = d.benchmark; pols(); $("#lat-policy").value = d.policy; tasks(); $("#lat-task").value = d.task;
+  loadScoring();
 }
-function enc() { return B.encoders[S.encoder]; }
+async function loadScoring() {
+  const key = `${$("#lat-benchmark").value}/${$("#lat-policy").value}/${$("#lat-task").value}`;
+  if (B && `${B.benchmark}/${B.policy}/${B.task}` === key) mapCache.set(key, Promise.resolve(B));
+  if (!mapCache.has(key)) mapCache.set(key, fetch(`${DATA_BASE}/${key}.json?v=${DATA_V}`).then(r => r.json()));
+  SB = await mapCache.get(key);
+  const ENC_LABEL = { prefix: "Precog-RM, prefix-trained (deployed in GRPO)", full: "Precog-RM, generalist, full rollouts only", raw: "raw action–observation space, no learning (nearest centroid)" };
+  const encSel = $("#sel-encoder"); encSel.innerHTML = ""; ["prefix", "full", "raw"].filter(k => SB.encoders[k]).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = ENC_LABEL[k]; encSel.appendChild(o); });
+  if (!SB.encoders[S.encoder]) S.encoder = Object.keys(SB.encoders)[0]; encSel.value = S.encoder;
+  S.thr = SB.stop_threshold; $("#theta").value = S.thr; $("#theta-val").textContent = S.thr.toFixed(2);
+  if (S.preset === "custom") S.preset = "k8";
+  $("#sel-support").value = S.preset; S.sel = null; applyPreset(); drawScoring();
+}
+
+// support presets: cvN = two cross-validation thirds as support, the third held out as queries; kN = a seeded random draw of
+// N rollouts per class as support and every other rollout as a query (the paper's few-shot protocol); custom = shift-clicks
+const lcg = (seed) => () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+function drawSupport(k, seed) { const rnd = lcg(seed * 7919 + 17), pass = new Map(SB.rollouts.map(r => [r.rid, r.reward >= 0.5])), rids = SB.rollouts.map(r => r.rid);
+  const pick = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, k); };
+  return new Set([...pick(rids.filter(r => pass.get(r))), ...pick(rids.filter(r => !pass.get(r)))]); }
+function applyPreset() {
+  const rids = SB.rollouts.map(r => r.rid);
+  if (S.preset.startsWith("cv")) { const held = new Set(SB.cv_folds[+S.preset[2]]); S.support = new Set(rids.filter(r => !held.has(r))); }
+  else if (S.preset.startsWith("k")) S.support = drawSupport(+S.preset.slice(1), S.draw || 0);
+  // custom: keep as is
+  if (S.sel == null || S.support.has(S.sel) || !rids.includes(S.sel)) S.sel = rids.find(r => !S.support.has(r)) ?? rids[0];
+  if ($("#redraw")) $("#redraw").disabled = !S.preset.startsWith("k");
+}
+function enc() { return SB.encoders[S.encoder]; }
 function zFinal(i) { const z = enc().z[i]; return z[z.length - 1]; }
 function proj(v) { const p = enc().pca; const c = v.map((x, k) => x - p.mean[k]); return [dot(c, p.components[0]), dot(c, p.components[1])]; }
 const dot = (a, b) => { let s = 0; for (let k = 0; k < a.length; k++) s += a[k] * b[k]; return s; };
@@ -149,19 +177,19 @@ function auroc(scores, labels) {
 }
 
 function drawScoring(resetT = true) {
-  const E = enc(), rolls = B.rollouts, idx = new Map(rolls.map((r, i) => [r.rid, i]));
+  const E = enc(), rolls = SB.rollouts, idx = new Map(rolls.map((r, i) => [r.rid, i]));
   const pass = new Map(rolls.map(r => [r.rid, r.reward >= 0.5]));
   const supP = [...S.support].filter(r => pass.get(r)).map(r => zFinal(idx.get(r)));
   const supF = [...S.support].filter(r => !pass.get(r)).map(r => zFinal(idx.get(r)));
   const cp = supP.length ? mean(supP) : null, cf = supF.length ? mean(supF) : null;
   const score = scoreFn(cp, cf);
-  const heldK = S.preset.startsWith("k") ? new Set(B.cv_folds[0]) : null;
-  const queries = rolls.filter(r => !S.support.has(r.rid) && (!heldK || heldK.has(r.rid)));
+  const heldCV = S.preset.startsWith("cv") ? new Set(SB.cv_folds[+S.preset[2]]) : null;
+  const queries = rolls.filter(r => !S.support.has(r.rid) && (!heldCV || heldCV.has(r.rid)));
   const qs = queries.map(r => score(zFinal(idx.get(r.rid)))), ql = queries.map(r => pass.get(r.rid));
   const au = auroc(qs, ql);
   const setN3 = (items) => { const el = $("#n3"); if (el) el.innerHTML = items.map(([v, l]) => `<div class="num"><b>${v}</b><span>${l}</span></div>`).join(""); };
-  setN3([[S.encoder === "raw" ? `${E.z[0][0].length}-d` : "128-d", S.encoder === "raw" ? "raw pooled embedding (reduced for the browser)" : "latent per rollout or prefix"], ["2 prototypes", "means of the support passes and failures"], ["0 params", "fit at inference"], [isNaN(au) ? "n/a" : fmt3(au), `held-out AUROC on ${B.task_id} under this support set`]]);
-  $("#score-badges").innerHTML = `<span class="badge">support: ${supP.length} pass + ${supF.length} fail</span><span class="badge">${queries.length} queries</span><span class="badge">AUROC ${isNaN(au) ? "n/a" : fmt3(au)}</span>${B.held_out ? "" : `<span class="badge warn">training-pool task</span>`}`;
+  setN3([[S.encoder === "raw" ? `${E.z[0][0].length}-d` : "128-d", S.encoder === "raw" ? "raw pooled embedding (reduced for the browser)" : "latent per rollout or prefix"], ["2 prototypes", "means of the support passes and failures"], ["0 params", "fit at inference"], [isNaN(au) ? "n/a" : fmt3(au), `held-out AUROC on ${SB.task_id} under this support set`]]);
+  $("#score-badges").innerHTML = `<span class="badge">support: ${supP.length} pass + ${supF.length} fail</span><span class="badge">${queries.length} queries</span><span class="badge">AUROC ${isNaN(au) ? "n/a" : fmt3(au)}</span>${SB.held_out ? "" : `<span class="badge warn">training-pool task</span>`}`;
   // selected rollout + prefix slider
   const sel = rolls[idx.get(S.sel)], zs = E.z[idx.get(S.sel)];
   const T = E.prefix ? sel.n_steps : 1;
@@ -185,13 +213,17 @@ function drawScoring(resetT = true) {
       if (st != null) { nStop++; stepsSaved += r.n_steps - st - 1; } });
     $("#theta-readout").innerHTML = `At θ=${thr.toFixed(2)} on this task's ${queries.length} queries: the controller stops <b>${nStop}</b> (${Math.round(100 * nStop / Math.max(1, queries.length))}%), is right on <b>${nStop ? Math.round(100 * nCorrect / nStop) : 0}%</b> of them, and skips <b>${Math.round(100 * stepsSaved / Math.max(1, stepsAll))}%</b> of their generation steps.`;
   } else $("#theta-readout").textContent = "";
-  // AUROC of every encoder under the same support set
-  const rows = Object.entries(B.encoders).map(([k, e]) => { const zf = (i) => e.z[i][e.z[i].length - 1];
-    const sp = [...S.support].filter(r => pass.get(r)).map(r => zf(idx.get(r))), sf = [...S.support].filter(r => !pass.get(r)).map(r => zf(idx.get(r)));
-    const sc = scoreFn(sp.length ? mean(sp) : null, sf.length ? mean(sf) : null);
-    return [k, auroc(queries.map(r => sc(zf(idx.get(r.rid)))), ql)]; });
+  // AUROC of every encoder under the same support set; for k presets also the mean over 50 random draws, since one draw of a
+  // few rollouts swings a lot
+  const aurocWith = (e, sup) => { const zf = (i) => e.z[i][e.z[i].length - 1], qs2 = rolls.filter(r => !sup.has(r.rid) && (!heldCV || heldCV.has(r.rid)));
+    const sp = [...sup].filter(r => pass.get(r)).map(r => zf(idx.get(r))), sf = [...sup].filter(r => !pass.get(r)).map(r => zf(idx.get(r)));
+    const sc = scoreFn(sp.length ? mean(sp) : null, sf.length ? mean(sf) : null); return auroc(qs2.map(r => sc(zf(idx.get(r.rid)))), qs2.map(r => pass.get(r.rid))); };
+  const kNow = S.preset.startsWith("k") ? +S.preset.slice(1) : null, NDRAW = 50;
+  const rows = Object.entries(SB.encoders).map(([k, e]) => [k, aurocWith(e, S.support), kNow ? d3.mean(d3.range(NDRAW), sd => aurocWith(e, drawSupport(kNow, sd))) : null]);
   const NAME = { prefix: "Precog-RM prefix-trained", full: "Precog-RM generalist", raw: "raw space, nearest centroid" };
-  $("#auroc-table").innerHTML = `<table class="mini"><tr><th>encoder</th><th>AUROC</th></tr>${rows.map(([k, a]) => `<tr class="${k === S.encoder ? "on" : ""}"><td>${NAME[k] || k}</td><td>${isNaN(a) ? "n/a" : fmt3(a)}</td></tr>`).join("")}</table>`;
+  $("#auroc-table").innerHTML = `<table class="mini"><tr><th>encoder</th><th>AUROC, this support</th>${kNow ? `<th>mean of ${NDRAW} draws</th>` : ""}</tr>${rows.map(([k, a, m]) => `<tr class="${k === S.encoder ? "on" : ""}"><td>${NAME[k] || k}</td><td>${isNaN(a) ? "n/a" : fmt3(a)}</td>${kNow ? `<td>${fmt3(m)}</td>` : ""}</tr>`).join("")}</table>`;
+  const mNow = kNow ? rows.find(r => r[0] === S.encoder)[2] : null;
+  if (mNow != null) $("#score-badges").insertAdjacentHTML("beforeend", `<span class="badge">mean of ${NDRAW} draws ${fmt3(mNow)}</span>`);
 }
 
 function drawLatent(E, rolls, idx, pass, cp, cf, score, zs) {

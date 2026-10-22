@@ -508,7 +508,7 @@ function obstacleScene(svg, f) {
   const wCol = (wv) => srColor(1 / (1 + Math.exp(-wv * Math.log(0.9 / 0.1) / C.refW))), amtOf = (wv) => Math.min(1, Math.abs(wv) / (0.6 * C.refW));
   // the task banner: the old task's text fades out fully before the new one fades in, over a box that stays put
   if (D2 && morph > 0) g.append("rect").attr("x", 20).attr("y", 10).attr("width", 860).attr("height", 38).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
-  drawBanner(g, opening, D2 ? 1 - sub(morph, 0, 0.45) : 1 - morph);
+  drawBanner(g, opening, x1 * (D2 ? 1 - sub(morph, 0, 0.45) : 1 - morph));   // act 3 ends without the banner; it returns with the map
   if (D2 && morph > 0.55) drawBanner(g, D2.b.rollouts.find(r => r.opening)?.opening || D2.id, sub(morph, 0.55, 1));
   const mg = g.append("g").attr("opacity", x1 * (1 - morph)).attr("transform", `translate(${tx},${ty}) scale(${k})`);
   D.gedges.forEach(e => { const wv = C.wOf(`${e.a}>${e.b}`), a = amtOf(wv); drawEdge(mg, e, d3.interpolateRgb(NEU, wCol(wv))(a), 0.45 + 0.75 * a, e.nr, 1.2 * a); });

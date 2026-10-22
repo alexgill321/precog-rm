@@ -40,31 +40,60 @@ function fit() {
 }
 window.addEventListener("resize", () => { laneCur = laneTarget = laneFor(beat && beat.el.classList.contains("wide")); fit(); }); fit();
 // ---------- playback ----------
-let scene = null, f = 0, beat = null, mode = "idle", t0 = 0, tw = null, landedOnce = new Set();
+// Each beat plays its slice of the scene once and holds the last frame. Moving forward fast-forwards to the new beat's start,
+// then plays it; moving back rewinds the canvas to the earlier beat's last frame and holds there. Acts whose first frame
+// equals the previous act's last frame (SEAMS) are crossed by playing or rewinding through the seam, so there is no fade;
+// any other change of scene crossfades. A move is a plan of segments: tween (eased catch-up or rewind), play (the beat's
+// clip at its own speed), swap (change scene, with or without a fade).
+const BEAT_EL = $$(".beat"), ORDER = [...new Set(BEAT_EL.map(b => b.dataset.scene))];
+const SEAMS = new Set(["a1>a2", "a2>a3", "a3>a4", "a4>a5"]);
+let scene = null, f = 0, beat = null, plan = [], cseg = null, t0 = 0, idleTick = 0;
+const fwdDur = (d) => Math.min(1.1, 0.35 + 2.2 * Math.abs(d)), backDur = (d) => Math.min(1.4, 0.4 + 2.5 * Math.abs(d));
 function crossfade() { const prev = cur; cur = 1 - cur; layers[prev].interrupt().transition().duration(450).attr("opacity", 0); layers[cur].interrupt().attr("opacity", 0).transition().duration(450).attr("opacity", 1); }
 function draw() { try { layers[cur].selectAll("*").remove(); SCENES[scene](layers[cur].node(), f); } catch (e) { console.error(scene, e); } }
+const tween = (to, durFn) => ({ kind: "tween", to, durFn }), play = (b) => ({ kind: "play", from: b.f0, to: b.f1, dur: b.f1 === b.f0 ? 0 : b.secs, el: b.el }), swap = (sc, at, fade) => ({ kind: "swap", sc, at, fade });
+function planTo(b, forward, far) {
+  const P = [], eps = 1e-4;
+  // a long jump (a reload mid-page, a fast fling) cuts straight to the target instead of racing through everything between
+  if (far) { if (b.scene !== scene) P.push(swap(b.scene, forward ? b.f0 : b.f1, true)); else P.push(tween(forward ? b.f0 : b.f1, fwdDur)); if (forward) P.push(play(b)); return P; }
+  if (b.scene === scene) {
+    if (forward) { if (Math.abs(f - b.f0) > eps) P.push(tween(b.f0, fwdDur)); P.push(play(b)); }
+    else if (Math.abs(f - b.f1) > eps) P.push(tween(b.f1, backDur));
+    return P; }
+  const ci = ORDER.indexOf(scene), ti = ORDER.indexOf(b.scene);
+  if (forward) {
+    if (scene && ti === ci + 1 && SEAMS.has(`${scene}>${b.scene}`)) { if (f < 1 - eps) P.push(tween(1, fwdDur)); P.push(swap(b.scene, 0, false)); if (b.f0 > eps) P.push(tween(b.f0, fwdDur)); }
+    else P.push(swap(b.scene, b.f0, true));
+    P.push(play(b));
+  } else {
+    if (ti === ci - 1 && SEAMS.has(`${b.scene}>${scene}`)) { if (f > eps) P.push(tween(0, backDur)); P.push(swap(b.scene, 1, false)); if (b.f1 < 1 - eps) P.push(tween(b.f1, backDur)); }
+    else P.push(swap(b.scene, b.f1, true));
+  }
+  return P; }
+function nextSeg(now) {
+  cseg = plan.shift() || null;
+  while (cseg && cseg.kind === "swap") { scene = cseg.sc; f = cseg.at; if (cseg.fade) crossfade(); draw(); cseg = plan.shift() || null; }
+  if (cseg && cseg.kind === "tween") { cseg.from = f; cseg.dur = cseg.durFn(cseg.to - f); }
+  t0 = now; }
 function activate(el) {
   if (!ready()) { pending = el; return; }
-  const b = { el, scene: el.dataset.scene, f0: +el.dataset.f0, f1: +el.dataset.f1, secs: +(el.dataset.secs || 3), hold: +(el.dataset.hold || 1.6) };
   if (beat && beat.el === el) return;
-  beat = b; $$(".beat").forEach(x => x.classList.toggle("active", x === el)); counters(el);
+  const b = { el, scene: el.dataset.scene, f0: +el.dataset.f0, f1: +el.dataset.f1, secs: +(el.dataset.secs || 3) };
+  const forward = !beat || BEAT_EL.indexOf(el) > BEAT_EL.indexOf(beat.el), far = !!beat && Math.abs(BEAT_EL.indexOf(el) - BEAT_EL.indexOf(beat.el)) > 3;
+  beat = b; BEAT_EL.forEach(x => x.classList.toggle("active", x === el)); counters(el);
   laneTarget = laneFor(el.classList.contains("wide")); if (laneCur == null) { laneCur = laneTarget; fit(); }
-  const now = performance.now();
-  if (b.scene !== scene) { scene = b.scene; f = b.f0; crossfade(); mode = "play"; t0 = now; }
-  else if (Math.abs(f - b.f0) < 1e-4) { mode = "play"; t0 = now; }
-  else { mode = "tween"; tw = { from: f, to: b.f0, dur: Math.min(1.1, 0.35 + 2.2 * Math.abs(b.f0 - f)) }; t0 = now; }
-  if (reduced) { f = b.f1; mode = "still"; draw(); el.classList.add("landed"); }
+  if (reduced) { if (b.scene !== scene) { scene = b.scene; crossfade(); } f = b.f1; plan = []; cseg = null; draw(); el.classList.add("landed"); return; }
+  plan = planTo(b, forward, far); nextSeg(performance.now());
+  if (!forward) el.classList.add("landed");   // going back lands on the beat's last frame straight away
 }
 function tick(now) {
   if (laneTarget != null && laneCur != null && Math.abs(laneTarget - laneCur) > 0.5) { laneCur += (laneTarget - laneCur) * 0.12; fit(); }
-  if (beat && scene && mode !== "still") {
-    const e = (now - t0) / 1000;
-    if (mode === "tween") { const q = clamp01(e / tw.dur); f = lerp(tw.from, tw.to, d3.easeCubicInOut(q)); if (q >= 1) { mode = "play"; t0 = now; } }
-    else if (mode === "play") { f = beat.f1 === beat.f0 ? beat.f1 : lerp(beat.f0, beat.f1, clamp01(e / beat.secs));
-      if (e >= beat.secs && !landedOnce.has(beat.el)) { landedOnce.add(beat.el); beat.el.classList.add("landed"); }
-      if (e >= beat.secs + beat.hold && beat.f1 !== beat.f0) { crossfade(); f = beat.f0; t0 = now; } }
+  if (scene && cseg) {
+    const q = cseg.dur > 0 ? clamp01((now - t0) / 1000 / cseg.dur) : 1;
+    f = lerp(cseg.from, cseg.to, cseg.kind === "tween" ? d3.easeCubicInOut(q) : q);
     draw();
-  }
+    if (q >= 1) { if (cseg.kind === "play") cseg.el.classList.add("landed"); nextSeg(now); }
+  } else if (scene && ++idleTick % 30 === 0) draw();   // holding: redraw now and then, in case data a scene uses arrived late
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -101,5 +130,5 @@ if (drawer) { const open = (panel) => { drawer.classList.add("open"); $$(".drawe
   const close = () => drawer.classList.remove("open");
   $$("button.inside").forEach(b => b.addEventListener("click", () => open(b.dataset.panel)));
   $("#drawer-close").addEventListener("click", close); document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); }); }
-window.PrecogStage = { activate, SCENES };
+window.PrecogStage = { activate, SCENES, _tick: tick, get state() { return { scene, f, beat: beat && BEAT_EL.indexOf(beat.el), seg: cseg && cseg.kind, queued: plan.length }; } };
 })();

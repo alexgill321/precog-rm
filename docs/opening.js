@@ -433,36 +433,38 @@ function findingScene(svg, f) {
     const tk = tg.append("g").attr("transform", `translate(${qx(i)},${qy})`).attr("opacity", app * (1 - gone));
     tk.append("rect").attr("x", -11).attr("y", -9).attr("width", 22).attr("height", 18).attr("rx", 9).attr("fill", "#fff").attr("stroke", "#b9b9b3").attr("stroke-width", 1.2);
     tk.append("text").attr("y", 4).attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", 700).attr("fill", MUTED).text("?"); });
-  // the prediction axis: top = predicted to succeed, bottom = predicted to fail
+  // the classifier's ranking: one slot per held-out rollout, the one it thinks most likely to succeed at the top
+  const nS = C.heldOut.length, rankOf = new Map([...C.heldOut].sort((a, c) => C.score(c) - C.score(a)).map((r, i) => [r, i]));
+  const RX = 806, PW = 46, PH = 13, slotY = (i) => 104 + i * ((372 - 104) / Math.max(1, nS - 1));
   const axIn = sub(q3, 0, 0.05) * (1 - out);
   if (axIn > 0) { const ag = g.append("g").attr("opacity", axIn);
-    ag.append("line").attr("x1", AX).attr("x2", AX).attr("y1", 92).attr("y2", 376).attr("stroke", "#c9c9c3").attr("stroke-width", 1.5);
-    ag.append("text").attr("x", AX).attr("y", 82).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", INK).attr("font-weight", 700).text("predicted to succeed");
-    ag.append("text").attr("x", AX).attr("y", 392).attr("text-anchor", "middle").attr("font-size", 11).attr("fill", INK).attr("font-weight", 700).text("predicted to fail"); }
-  // each held-out rollout is read along its path; a marker on the axis follows its running score, then settles as a dot
+    ag.append("text").attr("x", RX).attr("y", 72).attr("text-anchor", "middle").attr("font-size", 11.5).attr("font-weight", 700).attr("fill", INK).text("the classifier's ranking");
+    ag.append("text").attr("x", RX).attr("y", 89).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("most likely to succeed");
+    ag.append("text").attr("x", RX).attr("y", 392).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("most likely to fail");
+    d3.range(nS).forEach(i => { ag.append("rect").attr("x", RX - PW / 2).attr("y", slotY(i) - PH / 2).attr("width", PW).attr("height", PH).attr("rx", PH / 2).attr("fill", "none").attr("stroke", "#dcdcd6").attr("stroke-dasharray", "2,2");
+      ag.append("text").attr("x", RX - PW / 2 - 6).attr("y", slotY(i) + 3.5).attr("text-anchor", "end").attr("font-size", 9).attr("fill", MUTED).text(i + 1); }); }
+  // a held-out rollout's token: "?" until its outcome is revealed, then a green check or a red cross
+  const token = (gg, x, y, r, rv) => { const won = D.pass(r), fill = d3.interpolateRgb("#fff", won ? PASS : FAIL)(rv), t = gg.append("g").attr("transform", `translate(${x},${y})`);
+    t.append("rect").attr("x", -PW / 2).attr("y", -PH / 2).attr("width", PW).attr("height", PH).attr("rx", PH / 2).attr("fill", fill).attr("stroke", rv > 0.5 ? fill : "#b9b9b3").attr("stroke-width", 1.2);
+    t.append("text").attr("y", 3.6).attr("text-anchor", "middle").attr("font-size", 10).attr("font-weight", 700).attr("fill", rv > 0.5 ? "#fff" : MUTED).text(rv > 0.5 ? (won ? "✓" : "✗") : "?"); };
+  // each held-out rollout is read along its path, then its token drops into its slot in the ranking
   const dg = g.append("g").attr("opacity", 1 - out);
-  C.dots.forEach(d => { const i = d.i, r = d.r, l = local(i); if (l <= 0) return; const n = r.n_steps, rt = routeOf(r);
+  C.heldOut.forEach((r, i) => { const l = local(i); if (l <= 0 || l >= 1) return; const n = r.n_steps, rt = routeOf(r), sy = slotY(rankOf.get(r));
     if (i < slowN) { const u = sub(l, 0.1, 0.8) * n, settle = ease(sub(l, 0.8, 1)), routeOp = 1 - sub(l, 0.85, 1);
-      if (routeOp > 0 && l < 1) { rt.forEach((e, t) => { if (t + 1 < u) mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2.4).attr("stroke-opacity", 0.85 * routeOp * Math.min(1, u - t - 1)); });
-        const nd = D.gnode.get(r.steps[Math.min(n - 1, Math.max(0, Math.floor(u)))].c);
-        if (l < 0.12) { const [sx, sy] = toScr(nd.x, nd.y), lt = ease(sub(l, 0, 0.1)); bot(g, lerp(qx(i), sx, lt), lerp(qy, sy, lt), 8); }
-        else bot(mg, nd.x, nd.y, 10).attr("opacity", routeOp); }
-      const yRun = C.yS(C.partial(r, Math.max(0.0001, u))), mx = lerp(AX, d.x, settle), my = lerp(yRun, d.y, settle);
-      if (l < 1) { dg.append("line").attr("x1", AX - 16).attr("x2", AX + 16).attr("y1", yRun).attr("y2", yRun).attr("stroke", INK).attr("stroke-width", 1.5).attr("opacity", 0.5 * (1 - settle)); }
-      dg.append("circle").attr("cx", mx).attr("cy", my).attr("r", lerp(7, 5, settle)).attr("fill", "#fff").attr("stroke", INK).attr("stroke-width", 2).attr("opacity", 1 - sub(l, 0.95, 1));
-    } else if (l < 1) { rt.forEach(e => mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.4).attr("stroke-opacity", 0.35 * (1 - l))); } });
-  // placed dots, grey until the outcomes are revealed top to bottom
-  C.dots.forEach(d => { const l = local(d.i), placed = d.i < slowN ? sub(l, 0.95, 1) : sub(l, 0.3, 0.7); if (placed <= 0) return;
-    const rv = sub(q4, clamp01((d.y - 92) / 284) * 0.5, clamp01((d.y - 92) / 284) * 0.5 + 0.35);
-    dg.append("circle").attr("cx", d.x).attr("cy", d.y).attr("r", 5 * (d.i < slowN ? 1 : 0.4 + 0.6 * placed)).attr("fill", d3.interpolateRgb("#c9c9c3", D.pass(d.r) ? PASS : FAIL)(rv)).attr("stroke", "#fff").attr("stroke-width", 1.2).attr("opacity", d.i < slowN ? 1 : placed); });
-  const legendIn = sub(q4, 0.55, 0.85) * (1 - out);
-  if (legendIn > 0) { const lg = g.append("g").attr("opacity", legendIn).attr("transform", `translate(${AX - 62},414)`);
-    [[PASS, "succeeded", 0], [FAIL, "failed", 86]].forEach(([c, t, x]) => { lg.append("circle").attr("cx", x).attr("cy", -4).attr("r", 4.5).attr("fill", c); lg.append("text").attr("x", x + 9).attr("y", 0).attr("font-size", 10.5).attr("fill", INK).text(t); }); }
+      rt.forEach((e, t) => { if (t + 1 < u) mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2.4).attr("stroke-opacity", 0.85 * routeOp * Math.min(1, u - t - 1)); });
+      const nd = D.gnode.get(r.steps[Math.min(n - 1, Math.max(0, Math.floor(u)))].c);
+      if (l < 0.12) { const [sx, sy0] = toScr(nd.x, nd.y), lt = ease(sub(l, 0, 0.1)); bot(g, lerp(qx(i), sx, lt), lerp(qy, sy0, lt), 8); }
+      else if (l < 0.85) bot(mg, nd.x, nd.y, 10).attr("opacity", 1 - sub(l, 0.78, 0.85));
+      if (l >= 0.8) { const [ex, ey] = toScr(nd.x, nd.y); token(dg, lerp(ex, RX, settle), lerp(ey, sy, settle), r, 0); } }
+    else { rt.forEach(e => mg.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 1.4).attr("stroke-opacity", 0.35 * (1 - l)));
+      const lt = ease(sub(l, 0.3, 0.7)); if (l >= 0.3) token(dg, lerp(qx(i), RX, lt), lerp(qy, sy, lt), r, 0); } });
+  // placed tokens; at the reveal they turn over from the top of the ranking to the bottom
+  C.heldOut.forEach((r, i) => { if (local(i) < 1) return; const k = rankOf.get(r), s0 = (k / nS) * 0.55; token(dg, RX, slotY(k), r, sub(q4, s0, s0 + 0.3)); });
   // captions, one per beat
   const caps = [[sub(q1, 0.6, 0.9) * (1 - sub(q2, 0, 0.1)), `the classifier will learn from the other ${nT} rollouts only`],
     [sub(q2, 0, 0.1) * (1 - sub(q3, 0, 0.05)), `colour: what a linear classifier over states and transitions learned from those ${nT} · green leans toward success, red toward failure`],
-    [sub(q3, 0, 0.05) * (1 - sub(q4, 0, 0.1)), "it scores each held-out rollout from the states and transitions along its path"],
-    [sub(q4, 0, 0.1) * (1 - out), "each dot is one held-out rollout, placed by its predicted score and coloured by what actually happened"]];
+    [sub(q3, 0, 0.05) * (1 - sub(q4, 0, 0.1)), "it scores each held-out rollout from the states and transitions along its path, then ranks them"],
+    [sub(q4, 0, 0.1) * (1 - out), "each token is one held-out rollout, in the order the classifier ranked it · ✓ succeeded, ✗ failed"]];
   caps.forEach(([op, t]) => { if (op > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", op).text(t); });
   // the paper's Table 1: the best simple per-task classifier, on held-out rollouts of held-out tasks
   if (chartIn > 0 && RES) { const hg = g.append("g").attr("opacity", chartIn), rows = RES.table1.rows;

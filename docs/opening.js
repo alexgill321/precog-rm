@@ -340,14 +340,16 @@ function branchScene(svg, f) {
   const nIn = Math.min(N, Math.floor(st)), curF = st - nIn, hi = sub(f, 0.95, 1);
   const accE = new Map(), accS = new Map(), bump = (m, k, p) => { if (!m.has(k)) m.set(k, { nr: 0, np: 0 }); const o = m.get(k); o.nr++; if (p) o.np++; };
   for (let i = 0; i < nIn; i++) { const r = accOrder[i], p = D.pass(r); new Set(r.steps.map(s => s.c)).forEach(c => bump(accS, c, p)); new Set(routeOf(r).map(e => `${e.a}>${e.b}`)).forEach(k => bump(accE, k, p)); }
-  // beat 9 picks out clustered states, and transitions between them, that at least four in five rollouts passing through end the same way
-  const pred = (o) => o.nr >= 5 && (o.sr >= 0.8 || o.sr <= 0.2), predE = (e) => !isNoiseE(e) && pred(e), dim = (yes) => yes ? 1 : 1 - 0.5 * hi;
-  D.gedges.forEach(e => drawEdge(g, e, NEU, dim(false)));
+  // beat 9: everything that does not separate outcomes fades to grey; only clustered states, and transitions between them,
+  // that at least four in five rollouts passing through end the same way keep their colour, deepened to pass or fail
+  const pred = (o) => o.nr >= 5 && (o.sr >= 0.8 || o.sr <= 0.2), predE = (e) => !isNoiseE(e) && pred(e), keepOp = (yes) => yes ? 1 : 1 - 0.55 * hi;
+  const recolor = (base, p, sr) => d3.interpolateRgb(base, p ? (sr >= 0.8 ? PASS : FAIL) : NEU)(hi);
+  D.gedges.forEach(e => drawEdge(g, e, NEU, keepOp(false)));
   accE.forEach((a, k) => { const e = D.gedges.get(k), p = predE(e); if (p && hi > 0) drawEdge(g, e, "#fff", hi, a.nr, 4);
-    const col = p && hi > 0 ? d3.interpolateRgb(srColor(a.np / a.nr), e.sr >= 0.8 ? PASS : FAIL)(hi) : srColor(a.np / a.nr);
-    drawEdge(g, e, col, dim(p) * (p ? 1 + 0.8 * hi : 1), a.nr, p ? 1.5 * hi : 0); });
-  D.gnodes.forEach(nd => { const a = accS.get(nd.c), p = !nd.noise && pred(nd); drawState(g, nd, 1, dim(p), a ? srColor(a.np / a.nr) : NEU);
-    if (p && hi > 0) g.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", nd.r + 6).attr("fill", "none").attr("stroke", nd.sr >= 0.8 ? PASS : FAIL).attr("stroke-width", 2.5).attr("opacity", hi); });
+    drawEdge(g, e, recolor(srColor(a.np / a.nr), p, e.sr), p ? 1 + 0.8 * hi : keepOp(false), a.nr, p ? 1.5 * hi : 0); });
+  D.gnodes.forEach(nd => { const a = accS.get(nd.c), p = !nd.noise && pred(nd);
+    drawState(g, nd, 1, keepOp(p), recolor(a ? srColor(a.np / a.nr) : NEU, p, nd.sr)).attr("stroke-width", p ? 2.6 + 1.2 * hi : 2.6);
+    if (p && hi > 0) g.append("circle").attr("cx", nd.x).attr("cy", nd.y).attr("r", Math.max(0, nd.r - 1.5)).attr("fill", nd.sr >= 0.8 ? PASS : FAIL).attr("opacity", 0.25 * hi); });
   noiseLabel(g, 1 - hi * 0.5);
   // the path traced at the end of beat 7 hands over to the stream
   const handOff = 1 - sub(q8, 0, 0.05);
@@ -360,7 +362,7 @@ function branchScene(svg, f) {
   if (boxOp > 0) { const box = g.append("g").attr("transform", "translate(690,58)").attr("opacity", boxOp); box.append("rect").attr("width", 190).attr("height", 66).attr("rx", 10).attr("fill", "#fff").attr("fill-opacity", 0.92).attr("stroke", "#e3e3df");
     [[`rollouts   ${nIn} / ${N}`, 22, 700], [`states   ${accS.size}`, 40, 400], [`transitions   ${accE.size}`, 57, 400]].forEach(([t, y, w]) => box.append("text").attr("x", 14).attr("y", y).attr("font-size", 12).attr("font-weight", w).attr("fill", INK).text(t)); }
   g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", 1 - hi).text("colour: of the rollouts passing through, how many succeed (red: none, green: all)");
-  if (hi > 0) halo(g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).attr("opacity", hi)).text("highlighted: states, and transitions between them, where at least four in five rollouts passing through end the same way");
+  if (hi > 0) halo(g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 12).attr("font-weight", 700).attr("fill", INK).attr("opacity", hi)).text("left in colour: states, and transitions between them, where at least four in five rollouts passing through end the same way");
 }
 
 // ---------- beats ----------

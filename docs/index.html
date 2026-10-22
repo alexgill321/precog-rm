@@ -43,31 +43,31 @@
     <div class="card"><p>Could we recover the outcome <b>without the grader</b>?</p><p class="big">Can the outcome be read from the actions and observations alone?</p></div>
   </section>
   <section class="beat head" data-scene="a2" data-f0="0" data-f1="0.05" data-secs="2" data-hold="2">
-    <div class="card"><p class="act-n">2</p><h2>Where did it go wrong?</h2><p>Somewhere in its rollout, the agent made an action or received an environmental response that led to its failure.</p></div>
+    <div class="card"><p class="act-n">2</p><h2>Where did it go wrong?</h2><p>Somewhere in its rollout, the agent took an action or received an observation that led to its failure.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.05" data-f1="0.18" data-secs="7" data-hold="2.5">
-    <div class="card"><p>We can rewind to some point in the rollout, and resample to see if it will change the outcome.</p></div>
+    <div class="card"><p>We can rewind to an earlier step and resample from there to see whether the outcome changes.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.18" data-f1="0.3" data-secs="6" data-hold="2.5">
-    <div class="card"><p>If an agent completes the task with mixed success from a fixed prefix, then the agent is still stochastic at this point: its fate isn’t sealed.</p></div>
+    <div class="card"><p>If completions resampled from the same prefix both succeed and fail, the agent is still stochastic at that point: its fate isn’t sealed.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.3" data-f1="0.48" data-secs="8" data-hold="2.5">
-    <div class="card"><p>If we sample rollout completions from enough points, we could map out all the possible variations an agent would take on a single rollout. But this is far too expensive in practice.</p></div>
+    <div class="card"><p>Resampling from enough points would map out every path the agent could take on this task. But the number of rollouts this requires is far too large in practice.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.48" data-f1="0.6" data-secs="6" data-hold="2.5">
-    <div class="card"><p>In practice, we can afford a few dozen independent rollouts from the same agent for each task. GRPO does this for post-training in RL environments.</p></div>
+    <div class="card"><p>What we can afford is a few dozen independent rollouts of each task from the same agent, which is exactly what GRPO samples during RL post-training.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.6" data-f1="0.7" data-secs="5" data-hold="3">
-    <div class="card"><p>Many agent steps are nearly identical: the same action or the same question, phrased differently.</p></div>
+    <div class="card"><p>Many steps are nearly identical across rollouts: the same action, or the same question phrased differently.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.7" data-f1="0.84" data-secs="7" data-hold="2.5">
-    <div class="card"><p>By <b>clustering</b> similar steps across rollouts into shared <b>states</b>, every rollout turns into a path through a map of an agent’s behavior on a task.</p></div>
+    <div class="card"><p>By <b>clustering</b> similar steps across rollouts into shared <b>states</b>, every rollout becomes a path through a map of the agent’s behavior on the task.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.84" data-f1="0.95" data-secs="12" data-hold="2.5">
-    <div class="card"><p>Each rollout’s success or failure on a task dictates which connections and states in the map lead to which outcomes.</p></div>
+    <div class="card"><p>Each rollout’s success or failure marks the states and connections it passes through, showing which parts of the map lead to success and which to failure.</p></div>
   </section>
   <section class="beat" data-scene="a2" data-f0="0.95" data-f1="1.0" data-secs="3" data-hold="4">
-    <div class="card"><p class="big">We hypothesize that by treating multi-trial rollouts of an agent on a task as a map of the agent’s behavior on that task, we can reveal what actions and observations reveal the eventual outcome of a rollout.</p></div>
+    <div class="card"><p class="big">We hypothesize that treating an agent’s rollouts on a task as a map of its behavior reveals which actions and observations predict how a rollout will end.</p></div>
   </section>
   <section class="beat head wide" data-scene="act3" data-f0="0" data-f1="1" data-secs="9" data-hold="3">
     <div class="card"><p class="act-n">3</p><h2>The finding.</h2>

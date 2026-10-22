@@ -334,9 +334,12 @@ function branchScene(svg, f) {
     if (snap > 0) g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", snap).text("each circle is one state: similar steps merged from any rollout, at any step · left to right: when it tends to occur");
     return; }
   // ---- beats 8-9: each rollout's outcome tints the states and transitions it passes through
-  const q8 = sub(f, 0.84, 0.95), st = f >= 0.95 ? N : sub(q8, 0.05, 1) * N, nIn = Math.min(N, Math.floor(st)), curF = st - nIn, hi = sub(f, 0.95, 1);
+  // the first few rollouts (the attempt from before, then the resampled success) walk the map one at a time; the rest stream through quickly
+  const SLOW = 3, accOrder = [F, ...(Pr !== F ? [Pr] : []), ...order.filter(r => r !== F && r !== Pr)];
+  const q8 = sub(f, 0.84, 0.95), pq = sub(q8, 0.05, 1), st = f >= 0.95 ? N : pq < 0.62 ? (pq / 0.62) * SLOW : SLOW + sub(pq, 0.62, 0.94) * (N - SLOW);
+  const nIn = Math.min(N, Math.floor(st)), curF = st - nIn, hi = sub(f, 0.95, 1);
   const accE = new Map(), accS = new Map(), bump = (m, k, p) => { if (!m.has(k)) m.set(k, { nr: 0, np: 0 }); const o = m.get(k); o.nr++; if (p) o.np++; };
-  for (let i = 0; i < nIn; i++) { const r = order[i], p = D.pass(r); new Set(r.steps.map(s => s.c)).forEach(c => bump(accS, c, p)); new Set(routeOf(r).map(e => `${e.a}>${e.b}`)).forEach(k => bump(accE, k, p)); }
+  for (let i = 0; i < nIn; i++) { const r = accOrder[i], p = D.pass(r); new Set(r.steps.map(s => s.c)).forEach(c => bump(accS, c, p)); new Set(routeOf(r).map(e => `${e.a}>${e.b}`)).forEach(k => bump(accE, k, p)); }
   // beat 9 picks out clustered states, and transitions between them, that at least four in five rollouts passing through end the same way
   const pred = (o) => o.nr >= 5 && (o.sr >= 0.8 || o.sr <= 0.2), predE = (e) => !isNoiseE(e) && pred(e), dim = (yes) => yes ? 1 : 1 - 0.5 * hi;
   D.gedges.forEach(e => drawEdge(g, e, NEU, dim(false)));
@@ -350,9 +353,9 @@ function branchScene(svg, f) {
   const handOff = 1 - sub(q8, 0, 0.05);
   if (handOff > 0) { routeOf(F).forEach(e => g.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2.2).attr("stroke-opacity", 0.85 * handOff));
     const tip = D.gnode.get(F.steps[F.n_steps - 1].c); bot(g, tip.x, tip.y, 8).attr("opacity", handOff); }
-  if (nIn < N && curF > 0 && f < 0.95) { const cur = order[nIn], rt = routeOf(cur), upto = curF * (rt.length + 0.999);
-    rt.forEach((e, t) => { if (t < upto) g.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", D.pass(cur) ? PASS : FAIL).attr("stroke-width", 2.6).attr("stroke-opacity", 0.9 * Math.min(1, upto - t)); });
-    const tip = D.gnode.get(cur.steps[Math.min(cur.n_steps - 1, Math.floor(upto))].c); bot(g, tip.x, tip.y, 8); }
+  if (nIn < N && curF > 0 && f < 0.95) { const cur = accOrder[nIn], rt = routeOf(cur), slow = nIn < SLOW, upto = slow ? curF * (rt.length + 0.999) : rt.length;
+    rt.forEach((e, t) => { if (t < upto) g.append("path").attr("d", gEdgePath(e)).attr("fill", "none").attr("stroke", D.pass(cur) ? PASS : FAIL).attr("stroke-width", slow ? 2.6 : 1.6).attr("stroke-opacity", (slow ? 0.9 : 0.5) * Math.min(1, upto - t)); });
+    if (slow) { const tip = D.gnode.get(cur.steps[Math.min(cur.n_steps - 1, Math.floor(upto))].c); bot(g, tip.x, tip.y, 8); } }
   const boxOp = sub(q8, 0, 0.08) * (1 - hi);
   if (boxOp > 0) { const box = g.append("g").attr("transform", "translate(690,58)").attr("opacity", boxOp); box.append("rect").attr("width", 190).attr("height", 66).attr("rx", 10).attr("fill", "#fff").attr("fill-opacity", 0.92).attr("stroke", "#e3e3df");
     [[`rollouts   ${nIn} / ${N}`, 22, 700], [`states   ${accS.size}`, 40, 400], [`transitions   ${accE.size}`, 57, 400]].forEach(([t, y, w]) => box.append("text").attr("x", 14).attr("y", y).attr("font-size", 12).attr("font-weight", w).attr("fill", INK).text(t)); }

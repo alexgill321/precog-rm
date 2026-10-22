@@ -2,6 +2,7 @@
    (built by scripts/build_web_bundles.py). No framework, D3 only. */
 (() => {
 const $ = (s) => document.querySelector(s);
+const setStatus = (t) => { const el = document.querySelector("#load-status"); if (el) el.textContent = t; };
 // Bundles live in the dataset repo (web/ part); a local build (scripts/build_web_bundles.py -> docs/data) is used when served from localhost.
 const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 const DATA_BASE = LOCAL ? "data" : "https://huggingface.co/datasets/agill32/precog-rm/resolve/main/web";
@@ -43,9 +44,9 @@ function refreshTasks() {
 }
 async function loadSelected() {
   const bm = $("#sel-benchmark").value, pol = $("#sel-policy").value, task = $("#sel-task").value;
-  $("#load-status").textContent = `Loading ${bm}/${pol}/${task}…`;
+  setStatus(`Loading ${bm}/${pol}/${task}…`);
   B = await (await fetch(`${DATA_BASE}/${bm}/${pol}/${task}.json?v=${DATA_V}`)).json();
-  $("#load-status").textContent = "";
+  setStatus("");
   history.replaceState(null, "", `?task=${task}`);
   const maxT = d3.max(B.rollouts, r => r.n_steps);
   $("#task-badges").innerHTML = [
@@ -320,5 +321,5 @@ function toggleSupport(rid) {
   drawScoring(false);
 }
 
-init().catch(e => { $("#load-status").textContent = "Failed to load data: " + e; console.error(e); });
+init().catch(e => { setStatus("Failed to load data: " + e); console.error(e); });
 })();

@@ -77,7 +77,7 @@ function speech(g, x, y, text, op = 1, color = INK) { const w = text.length * 7.
 
 function attemptScene(svg, f) {
   const g = svg.append("g"), r = D.pairFP.f, n = r.n_steps, steps = r.steps, grade = r.grader;
-  const opening = r.opening || "", fIn = sub(f, 0, 0.03), shrink = ease(sub(f, 0.07, 0.11));
+  const opening = r.opening || "", fIn = sub(f, 0, 0.008), typed = sub(f, 0.006, 0.052), agentIn = sub(f, 0.05, 0.062), shrink = ease(sub(f, 0.07, 0.11));
   const u = sub(f, 0.11, 0.74), p = n * Math.pow(u, 1.6);
   const doneT = sub(f, 0.75, 0.79), gradT = ease(sub(f, 0.80, 0.83)), scanT = sub(f, 0.83, 0.88), verT = sub(f, 0.88, 0.92), strikeT = ease(sub(f, 0.93, 0.96)), glowT = sub(f, 0.955, 0.99);
   // camera: zoomed in on the current step, pulling out as the attempt grows
@@ -116,7 +116,8 @@ function attemptScene(svg, f) {
   { const big = g.append("g").attr("opacity", fIn * (1 - shrink));
     big.append("rect").attr("x", 130).attr("y", 70).attr("width", 640).attr("height", 136).attr("rx", 14).attr("fill", "#fff").attr("stroke", "#c9c9c3").attr("stroke-width", 1.4);
     icon(big, "clipboard-list", 164, 104, 28, INK); big.append("text").attr("x", 190).attr("y", 100).attr("font-size", 11).attr("letter-spacing", 1.4).attr("fill", MUTED).text("TASK · THE CUSTOMER WRITES");
-    textBlock(big, 160, 140, wrapText(`“${opening}”`, 56), 19, INK, 3, false);
+    const shown = opening.slice(0, Math.round(opening.length * typed)), caret = typed < 1 && Math.floor(f * 900) % 2 === 0 ? "▍" : "";
+    textBlock(big, 160, 140, wrapText(`“${shown}${typed >= 1 ? "”" : caret}`, 56), 19, INK, 3, false);
     const ban = g.append("g").attr("opacity", shrink);
     ban.append("rect").attr("x", 20).attr("y", 10).attr("width", 860).attr("height", 38).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df");
     icon(ban, "clipboard-list", 40, 29, 18, INK); ban.append("text").attr("x", 58).attr("y", 33).attr("font-size", 12.5).attr("fill", INK).text(`Task · “${opening.length > 100 ? opening.slice(0, 99) + "…" : opening}”`); }
@@ -124,8 +125,8 @@ function attemptScene(svg, f) {
   const ar = Math.max(8, Math.min(16, k * 0.03));
   let axS = sx(Math.min(p, n) - 0.5), ayS = cy - ch / 2 - ar - 8;
   if (shrink < 1) { axS = lerp(450, axS, shrink); ayS = lerp(268, ayS, shrink); }
-  if (fIn > 0) { const sp = bot(g, axS, ayS, shrink < 1 ? lerp(18, ar, shrink) : ar); sp.attr("opacity", fIn);
-    const sI = clamp01(p - Math.floor(p)), typing = (p > 0 && p < n && sI < 0.25) || (shrink < 1 && f > 0.03);
+  if (agentIn > 0) { const sp = bot(g, axS, ayS, shrink < 1 ? lerp(18, ar, shrink) : ar); sp.attr("opacity", agentIn);
+    const sI = clamp01(p - Math.floor(p)), typing = (p > 0 && p < n && sI < 0.25) || (shrink < 1 && f > 0.062);
     if (typing) { const ph = Math.floor(f * 400) % 3; speech(g, axS + 26, ayS - 4, ["·  ", "·· ", "···"][ph], 1, MUTED); } }
   // done!
   if (doneT > 0) { speech(g, axS, ayS - ar - 4, "Done!", doneT, INK); }
@@ -256,7 +257,12 @@ function draw(kind, node, frac) {
 // token estimate for the focus rollout's first steps (chars / 4), for the hero counter
 function tokensUpTo(r, upto) { let n = 0; for (let t = 0; t < Math.min(upto, r.n_steps); t++) n += (r.steps[t].a.length + r.steps[t].o.length) / 4; return Math.round(n); }
 window.PrecogTokens = tokensUpTo;
-function load(b) { B = b; D = prep(b); document.dispatchEvent(new CustomEvent("precog:opening")); }
+function bindText() { const r = D.pairFP.f, gr = r.grader;
+  document.querySelectorAll('[data-bind="n-steps"]').forEach(el => el.textContent = r.n_steps);
+  document.querySelectorAll('[data-bind="grader-summary"]').forEach(el => { if (!gr) { el.textContent = D.pass(r) ? "it passed" : "it failed"; return; }
+    const ok = gr.basis.filter(b => (gr.breakdown[b] ?? 0) >= 0.5).map(b => BASIS_LABEL[b] || b), bad = gr.basis.filter(b => (gr.breakdown[b] ?? 0) < 0.5).map(b => BASIS_LABEL[b] || b);
+    el.textContent = (ok.length ? `${ok.join(" and ")}: right. ` : "") + (bad.length ? `${bad.join(" and ")}: wrong. ` : "") + (D.pass(r) ? "Passed." : "Failed."); }); }
+function load(b) { B = b; D = prep(b); bindText(); document.dispatchEvent(new CustomEvent("precog:opening")); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);
 window.PrecogOpening = { draw, get data() { return D; } };

@@ -176,3 +176,6 @@ body.scrolly { background:#f7f7f5; }
 .panel.wide-panel { flex:none; width:100%; max-height:420px; }
 /* the latent panel's redraw button */
 button.redraw { font:inherit; font-size:13px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px 12px; cursor:pointer; } button.redraw:disabled { opacity:.4; cursor:default; }
+/* the closing beat's citation wraps inside the narrow card */
+.beat .card pre.cite { white-space:pre-wrap; word-break:break-word; font-size:10.5px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+.beat .card p.links { margin:10px 0 0; }

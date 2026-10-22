@@ -711,32 +711,53 @@ function payoffScene(svg, f) {
   if (q3 <= 0) { const cap = q2 > 0.1 ? `θ = ${D7.thr}: stop once P(pass) > ${D7.thr} or < ${(1 - D7.thr).toFixed(1)} · a stopped rollout's reward is the prediction · illustration: GPT-5-mini rollouts of ${D7.id} from the release`
       : `illustration with released rollouts (GPT-5-mini on ${D7.id}) · the paper's GRPO runs train Qwen3-8B on Tau2-Bench retail`;
     g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).text(cap); }
-  // beat 3: Table 3, compute saved against the trained agent's pass@1
-  const tIn = sub(q3, 0.1, 0.3);
-  if (tIn > 0 && RES && RES.grpo) { const cg = g.append("g").attr("opacity", tIn), T = RES.grpo.table, base = T.find(t => t.id === "baseline"), grow = ease(sub(q3, 0.25, 0.7)), hl = sub(q3, 0.7, 0.9);
-    chartTitle(cg, 40, "Training with the controller", "GRPO on Tau2-Bench retail, Qwen3-8B, 50 batches · mean ± std over 3 seeds · paper, Table 3");
-    const X0c = 120, X1c = 820, Y0 = 360, Y1 = 100, xs = d3.scaleLinear().domain([0, 70]).range([X0c, X1c]), ys = d3.scaleLinear().domain([15, 42]).range([Y0, Y1]);
-    [20, 25, 30, 35, 40].forEach(v => { cg.append("line").attr("x1", X0c).attr("x2", X1c).attr("y1", ys(v)).attr("y2", ys(v)).attr("stroke", "#ecece8"); cg.append("text").attr("x", X0c - 6).attr("y", ys(v) + 3.5).attr("text-anchor", "end").attr("font-size", 9.5).attr("fill", MUTED).text(v); });
-    [0, 10, 20, 30, 40, 50, 60, 70].forEach(v => cg.append("text").attr("x", xs(v)).attr("y", Y0 + 16).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", INK).text(`${v}%`));
-    cg.append("text").attr("x", (X0c + X1c) / 2).attr("y", Y0 + 32).attr("text-anchor", "middle").attr("font-size", 10).attr("fill", MUTED).text("training FLOPs saved");
-    cg.append("text").attr("x", X0c - 34).attr("y", Y1 - 10).attr("font-size", 10).attr("fill", MUTED).text("pass@1 on the test split (%)");
-    // standard GRPO: its mean and one standard deviation either side; and the model before any training
-    cg.append("rect").attr("x", X0c).attr("y", ys(base.pass1[0] + base.pass1[1])).attr("width", X1c - X0c).attr("height", ys(base.pass1[0] - base.pass1[1]) - ys(base.pass1[0] + base.pass1[1])).attr("fill", "#2b5fb3").attr("opacity", 0.08);
-    cg.append("line").attr("x1", X0c).attr("x2", X1c).attr("y1", ys(base.pass1[0])).attr("y2", ys(base.pass1[0])).attr("stroke", "#2b5fb3").attr("stroke-dasharray", "5,3");
-    cg.append("text").attr("x", X1c).attr("y", ys(base.pass1[0] + base.pass1[1]) - 5).attr("text-anchor", "end").attr("font-size", 10).attr("fill", "#2b5fb3").text(`standard GRPO: ${base.pass1[0]} ± ${base.pass1[1]}`);
-    cg.append("line").attr("x1", X0c).attr("x2", X1c).attr("y1", ys(RES.grpo.base_pass1)).attr("y2", ys(RES.grpo.base_pass1)).attr("stroke", MUTED).attr("stroke-dasharray", "2,3");
-    cg.append("text").attr("x", X1c).attr("y", ys(RES.grpo.base_pass1) - 5).attr("text-anchor", "end").attr("font-size", 10).attr("fill", MUTED).text(`before training: ${RES.grpo.base_pass1}`);
-    T.filter(t => t.flops_saved).forEach((t, i) => { const x = xs(t.flops_saved[0] * grow), y = ys(t.pass1[0]), op = sub(grow, i * 0.1, i * 0.1 + 0.3), col = t.support === "permanent" ? INK : "#5f86cf";
-      const pg = cg.append("g").attr("opacity", op);
-      pg.append("line").attr("x1", x).attr("x2", x).attr("y1", ys(t.pass1[0] - t.pass1[1])).attr("y2", ys(t.pass1[0] + t.pass1[1])).attr("stroke", col).attr("stroke-width", 1.2).attr("opacity", 0.5);
-      pg.append("circle").attr("cx", x).attr("cy", y).attr("r", 5).attr("fill", col);
-      // labels sit above their point, except the one crowded by its neighbour, which goes below and to the left
-      const below = t.id === "es065_mc0";
-      pg.append("text").attr("x", below ? x - 6 : x).attr("y", below ? y + 17 : y - 10).attr("text-anchor", below ? "end" : "middle").attr("font-size", 9.5).attr("fill", col).text(`${t.support === "permanent" ? "pre-collected" : "rolling"} θ=${t.theta}${t.mc ? `, ${t.mc} kept` : ""}`);
-      if (t.id === "limit" && hl > 0) { cg.append("circle").attr("cx", x).attr("cy", y).attr("r", 11).attr("fill", "none").attr("stroke", INK).attr("stroke-width", 2).attr("opacity", hl);
-        cg.append("text").attr("x", x).attr("y", y + 46).attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", 700).attr("fill", INK).attr("opacity", hl).text(`${t.flops_saved[0]}% fewer FLOPs · pass@1 ${t.pass1[0]}`); } });
+  // beat 3: the paper's Figure 5, drawn from its curves: training reward, test pass@1 and cumulative FLOPs, step by step
+  const tIn = sub(q3, 0.08, 0.25);
+  if (tIn > 0 && RES && RES.grpo && RES.grpo.curves) { const cg = g.append("g").attr("opacity", tIn), C5 = RES.grpo.curves, T = RES.grpo.table, grow = sub(q3, 0.2, 0.75), hl = sub(q3, 0.78, 0.95), upto = grow * 49;
+    chartTitle(cg, 40, "Training with the controller", "GRPO on Tau2-Bench retail, Qwen3-8B, 50 batches · mean of 3 seeds · paper, Figure 5");
+    // the paper's encoding: colour = support, line style = θ, line width = rollouts per group kept to completion (mc)
+    const style = (id) => { if (id === "baseline") return { col: "#8a8a86", dash: null, w: 2.2 }; const t = T.find(x => x.id === id);
+      return { col: t.support === "permanent" ? "#c2410c" : "#2b5fb3", dash: t.theta === 0.8 ? null : t.theta === 0.7 ? "6,3" : "2,3", w: t.mc ? 2.6 : 1.4 }; };
+    const focus = (id) => id === "baseline" || id === "limit", opOf = (id) => focus(id) ? 1 : 1 - 0.75 * hl;
+    const panels = [["reward", "(a) training reward", [0.05, 0.5], [0.1, 0.2, 0.3, 0.4], (v) => v.toFixed(1)], ["pass1", "(b) pass@1 on the test split (%)", [15, 40], [20, 25, 30, 35], (v) => v],
+      ["flops_pct", "(c) FLOPs consumed (% of baseline)", [35, 110], [50, 75, 100], (v) => v]];
+    panels.forEach(([key, label, dom, ticks, fmt], pi) => { const X0 = 70 + pi * 285, X1 = X0 + 220, Y0 = 340, Y1 = 110;
+      const xs = d3.scaleLinear().domain([0, 49]).range([X0, X1]), ys = d3.scaleLinear().domain(dom).range([Y0, Y1]);
+      cg.append("text").attr("x", X0).attr("y", 96).attr("font-size", 11).attr("font-weight", 700).attr("fill", INK).text(label);
+      ticks.forEach(v => { cg.append("line").attr("x1", X0).attr("x2", X1).attr("y1", ys(v)).attr("y2", ys(v)).attr("stroke", "#ecece8"); cg.append("text").attr("x", X0 - 6).attr("y", ys(v) + 3.5).attr("text-anchor", "end").attr("font-size", 9.5).attr("fill", MUTED).text(fmt(v)); });
+      [0, 25, 49].forEach(v => cg.append("text").attr("x", xs(v)).attr("y", Y0 + 15).attr("text-anchor", "middle").attr("font-size", 9.5).attr("fill", INK).text(v === 49 ? 50 : v));
+      cg.append("text").attr("x", (X0 + X1) / 2).attr("y", Y0 + 29).attr("text-anchor", "middle").attr("font-size", 9.5).attr("fill", MUTED).text("training step");
+      if (key === "pass1") { cg.append("line").attr("x1", X0).attr("x2", X1).attr("y1", ys(RES.grpo.base_pass1)).attr("y2", ys(RES.grpo.base_pass1)).attr("stroke", "#8a8a86").attr("stroke-dasharray", "3,3");
+        cg.append("text").attr("x", X1).attr("y", ys(RES.grpo.base_pass1) + 12).attr("text-anchor", "end").attr("font-size", 9).attr("fill", MUTED).text(`before training: ${RES.grpo.base_pass1}`); }
+      if (key === "reward") { const b = C5.baseline.reward, pts = b.step.map((st, i) => [st, b.lo[i], b.hi[i]]).filter(p => p[0] <= upto);   // the baseline's seed spread
+        if (pts.length > 1) cg.append("path").attr("d", d3.area().x(p => xs(p[0])).y0(p => ys(p[1])).y1(p => ys(p[2]))(pts)).attr("fill", "#8a8a86").attr("opacity", 0.18); }
+      Object.keys(C5).sort((a, b) => focus(a) - focus(b)).forEach(id => { const c = C5[id][key]; if (!c) return; const st = style(id), pts = c.step.map((x, i) => [x, c.mean[i]]).filter(p => p[0] <= upto);
+        if (pts.length > 1) cg.append("path").attr("d", d3.line().x(p => xs(p[0])).y(p => ys(p[1]))(pts)).attr("fill", "none").attr("stroke", st.col).attr("stroke-width", st.w).attr("stroke-dasharray", st.dash).attr("opacity", opOf(id)); });
+      // the end values of standard GRPO and the configuration that saves 47.3%
+      if (hl > 0 && key !== "reward") { const lim = C5.limit[key], base = C5.baseline[key], last = (c) => c.mean[c.mean.length - 1];
+        [[lim, "#c2410c", -10], [base, "#6b6b66", 14]].forEach(([c, col, dy]) => cg.append("text").attr("x", X1 + 4).attr("y", ys(last(c)) + dy * 0.3 + 3).attr("font-size", 10).attr("font-weight", 700).attr("fill", col).attr("opacity", hl).text(key === "flops_pct" ? `${Math.round(last(c))}%` : last(c).toFixed(1))); } });
+    // legend, two rows
+    const L = [["baseline", "standard GRPO"], ...T.filter(t => t.flops_saved).map(t => [t.id, `${t.support === "permanent" ? "pre-collected" : "rolling"} θ=${t.theta}${t.mc ? `, ${t.mc} kept` : ""}`])];
+    L.forEach(([id, t], i) => { const st = style(id), lx = 70 + (i % 4) * 200, ly = 388 + Math.floor(i / 4) * 16, lg = cg.append("g").attr("opacity", opOf(id));
+      lg.append("line").attr("x1", lx).attr("x2", lx + 22).attr("y1", ly).attr("y2", ly).attr("stroke", st.col).attr("stroke-width", st.w).attr("stroke-dasharray", st.dash);
+      lg.append("text").attr("x", lx + 28).attr("y", ly + 3.5).attr("font-size", 10).attr("fill", INK).attr("font-weight", id === "limit" && hl > 0 ? 700 : 400).text(t); });
     g.append("text").attr("x", 20).attr("y", 432).attr("font-size", 11).attr("fill", MUTED).attr("opacity", tIn)
-      .text("rolling: support from the run's own completed groups · pre-collected: support from another model's rollouts · kept: rollouts per group always run to completion"); }
+      .text(hl > 0 ? "picked out: support pre-collected from another model, θ=0.8 · 47.3% fewer FLOPs, pass@1 31.9 against 35.0 ± 3.6 for standard GRPO (Table 3)"
+        : "rolling: support from the run's own completed groups · pre-collected: support from another model's rollouts · kept: rollouts per group always run to completion"); }
+}
+
+// ---------- the return (act 8): the story in six frames, each drawn by its own scene at a telling moment ----------
+const MONTAGE = [["a1", 0.92, 1, "one rollout, graded only at the end"], ["a2", 1, 2, "fifty rollouts, one map"], ["a3", 0.74, 3, "a classifier reads the map"],
+  ["a5", 1, 5, "Precog-RM: one space, two prototypes"], ["a6", 0.95, 6, "outcomes called mid-rollout"], ["a7", 0.62, 7, "rollouts stopped during training"]];
+function returnScene(svg, f) {
+  const g = svg.append("g"), k = 280 / W, cw = W * k, ch = H * k;
+  MONTAGE.forEach(([kind, at, act, label], i) => { const op = ease(sub(f, i * 0.1, i * 0.1 + 0.18)); if (op <= 0) return;
+    const col = i % 3, row = Math.floor(i / 3), x = 15 + col * 295, y = 40 + row * 192, cell = g.append("g").attr("transform", `translate(${x},${y + (1 - op) * 10})`).attr("opacity", op);
+    cell.append("rect").attr("x", -3).attr("y", -3).attr("width", cw + 6).attr("height", ch + 6).attr("rx", 8).attr("fill", "#fbfbf9").attr("stroke", "#e3e3df");
+    const id = `montage-clip-${i}`; cell.append("clipPath").attr("id", id).append("rect").attr("width", cw).attr("height", ch);
+    const inner = cell.append("g").attr("clip-path", `url(#${id})`).append("g").attr("transform", `scale(${k})`);
+    try { beats[kind](inner, at); } catch (e) { console.error("montage", kind, e); }
+    cell.append("text").attr("x", 0).attr("y", ch + 20).attr("font-size", 11.5).attr("fill", INK).html(`<tspan font-weight="700">${act}</tspan>  ${label}`); });
 }
 
 // ---------- the state-map panel (act 3's "look inside"): any task's global state graph, coloured by outcome ----------
@@ -771,6 +792,7 @@ const beats = {
   a5(svg, f) { modelScene(svg, f); },
   a6(svg, f) { proofScene(svg, f); },
   a7(svg, f) { payoffScene(svg, f); },
+  a8(svg, f) { returnScene(svg, f); },
   // B1: one attempt, ending in failure
   o1(svg, f) { const g = svg.append("g"), r = D.pairFP.f, n = Math.min(D.S, r.n_steps), prog = sub(f, 0.05, 0.85) * n, upto = Math.floor(prog);
     g.append("text").attr("x", 60).attr("y", 60).attr("font-size", 13).attr("fill", MUTED).text("one attempt at the task");

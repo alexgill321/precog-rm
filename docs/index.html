@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
 <meta name="description" content="Precog-RM: an outcome-predictive representation of LLM agent trajectories, told as a story on one task.">
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body class="scrolly">
@@ -15,7 +15,7 @@
   <section class="beat head hero" data-scene="a1" data-f0="0" data-f1="0.062" data-secs="4" data-hold="6">
     <div class="card">
       <p class="kicker">Precog-RM · arXiv 2610.19614</p>
-      <h1>We set out to learn a representation that captures the critical behavioral patterns of agents on long-horizon, tool-calling tasks.</h1>
+      <h1>Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories</h1>
       <p class="authors">Alexander Gill, Guram Gogia, Francisco Guzmán · Handshake AI · University of Utah</p>
       <p class="links"><a class="btn light" href="https://arxiv.org/abs/2610.19614">Paper</a><a class="btn light" href="https://github.com/alexgill321/precog-rm">Code</a><a class="btn light" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data</a></p>
       <p class="scroll-hint">Scroll ↓</p>
@@ -154,11 +154,16 @@
   <section class="beat" data-scene="a7" data-f0="0.9" data-f1="1.0" data-secs="2" data-hold="4">
     <div class="card"><p class="big">Rollouts whose outcome is already decided never need to be finished, and the way the agent learns stays the same.</p></div>
   </section>
-  <section class="beat head wide" data-scene="act8" data-f0="0" data-f1="1" data-secs="5" data-hold="10">
-    <div class="card"><p class="act-n">8</p><h2>A representation that keeps the outcome, and carries it.</h2>
-<p>Same-task outcomes are separable in embedded action–observation sequences; Precog-RM carries that signal to unseen tasks and policies from a single batch; it predicts mid-rollout and abstains when the signal is absent; and as a GRPO controller it cuts training FLOPs by up to 47.3% at near-baseline pass@1.</p>
-      <p class="lands">Now run it again on a task you choose.</p>
+  <section class="beat head" data-scene="a8" data-f0="0" data-f1="0.72" data-secs="5" data-hold="3">
+    <div class="card"><p class="act-n">8</p><h2>Back to the beginning</h2><p>We set out to learn a representation that captures the critical behavioral patterns of agents on long-horizon, tool-calling tasks.</p></div>
+  </section>
+  <section class="beat" data-scene="a8" data-f0="0.72" data-f1="1.0" data-secs="2" data-hold="3">
+    <div class="card"><p class="big">Precog-RM keeps the outcome signal in a rollout’s actions and observations, and carries it to new tasks and agents from a single batch of labels.</p></div>
+  </section>
+  <section class="beat" data-scene="a8" data-f0="1.0" data-f1="1.0" data-secs="1" data-hold="4">
+    <div class="card"><p>Run the story again on a task you choose, or read the paper and code.</p>
       <button class="inside" data-panel="explore">Pick another task</button>
+      <p class="links"><a class="btn light" href="https://arxiv.org/abs/2610.19614">Paper</a><a class="btn light" href="https://github.com/alexgill321/precog-rm">Code</a><a class="btn light" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data</a></p>
       <pre class="cite">@article{gill2026divergent,
   title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
   author  = {Gill, Alexander and Gogia, Guram and Guzm\'an, Francisco},
@@ -214,8 +219,8 @@
 <script src="app.js?v=16"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=33"></script>
-<script src="opening.js?v=41"></script>
+<script src="opening.js?v=42"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=15"></script>
+<script src="stage.js?v=16"></script>
 </body>
 </html>

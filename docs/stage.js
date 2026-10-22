@@ -18,6 +18,7 @@ const SCENES = {
   a5: (g, f) => O().draw("a5", g, f),
   a6: (g, f) => O().draw("a6", g, f),
   a7: (g, f) => O().draw("a7", g, f),
+  a8: (g, f) => O().draw("a8", g, f),
   act2: (g, f) => { if (f < 0.2) O().draw("o2", g, seg(f, 0, 0.2)); else if (f < 0.37) O().draw("o3", g, seg(f, 0.2, 0.37)); else if (f < 0.52) O().draw("o4", g, seg(f, 0.37, 0.52)); else if (f < 0.72) O().draw("o5", g, seg(f, 0.52, 0.72)); else O().draw("o6", g, seg(f, 0.72, 1)); },
   act3: (g, f) => P().renderScene(g, ST().scene, 0.30 + 0.08 * f),
   act4: (g, f) => { O().draw("o4", g, f); if (f > 0.9) { const t = d3.select(g).append("g").attr("opacity", sub(f, 0.9, 1)).attr("transform", "translate(640,40)");

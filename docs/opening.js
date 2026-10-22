@@ -54,9 +54,9 @@ function lane(g, r, y, x0, x1, upto, size, D_, op = 1, withBot = true, frac = nu
 
 
 // ---------- the attempt scene (act 1) ----------
-const ACT_LABEL = { "message-square": "message to the customer", "id-card": "look up the customer", "package": "read an order", "tag": "read a product", "undo-2": "return items", "repeat": "exchange items", "map-pin": "change an address", "pencil": "modify an order", "ban": "cancel an order", "hand-helping": "hand off to a human", "calculator": "calculate", "credit-card": "payment", "wrench": "tool call" };
-const OBS_LABEL = { user: "the customer replies", server: "the system returns", "triangle-alert": "the system reports an error" };
-const BASIS_LABEL = { DB: "final database state", COMMUNICATE: "required info given to the customer", ACTION: "required actions taken", NL_ASSERTION: "behaviour checks", ENV_ASSERTION: "environment checks" };
+const ACT_LABEL = { "message-square": "message to the user", "id-card": "look up the user", "package": "read an order", "tag": "read a product", "undo-2": "return items", "repeat": "exchange items", "map-pin": "change an address", "pencil": "modify an order", "ban": "cancel an order", "hand-helping": "hand off to a human", "calculator": "calculate", "credit-card": "payment", "wrench": "tool call" };
+const OBS_LABEL = { user: "the user replies", server: "a tool returns", "triangle-alert": "a tool reports an error" };
+const BASIS_LABEL = { DB: "final database state", COMMUNICATE: "required info given to the user", ACTION: "required actions taken", NL_ASSERTION: "behaviour checks", ENV_ASSERTION: "environment checks" };
 const clean = (t) => (t || "").replace(/\s+/g, " ").trim();
 function actText(a) { const m = toolCall(a); if (!m) return clean(a).replace(/\*\*/g, "");
   const i = a.indexOf("("), j = a.lastIndexOf(")"); try { const args = JSON.parse(a.slice(i + 1, j));
@@ -115,7 +115,7 @@ function attemptScene(svg, f) {
   // the customer's request: a large card first, then a banner across the top
   { const big = g.append("g").attr("opacity", fIn * (1 - shrink));
     big.append("rect").attr("x", 130).attr("y", 70).attr("width", 640).attr("height", 136).attr("rx", 14).attr("fill", "#fff").attr("stroke", "#c9c9c3").attr("stroke-width", 1.4);
-    icon(big, "clipboard-list", 164, 104, 28, INK); big.append("text").attr("x", 190).attr("y", 100).attr("font-size", 11).attr("letter-spacing", 1.4).attr("fill", MUTED).text("TASK · THE CUSTOMER WRITES");
+    icon(big, "clipboard-list", 164, 104, 28, INK); big.append("text").attr("x", 190).attr("y", 100).attr("font-size", 11).attr("letter-spacing", 1.4).attr("fill", MUTED).text("TASK · THE USER WRITES");
     const shown = opening.slice(0, Math.round(opening.length * typed)), caret = typed < 1 && Math.floor(f * 900) % 2 === 0 ? "▍" : "";
     textBlock(big, 160, 140, wrapText(`“${shown}${typed >= 1 ? "”" : caret}`, 56), 19, INK, 3, false);
     const ban = g.append("g").attr("opacity", shrink);
@@ -149,7 +149,7 @@ function attemptScene(svg, f) {
       res.append("text").attr("x", 52).attr("y", 20).attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", 800).attr("fill", "#fff").text(D.pass(r) ? "PASSED" : "FAILED"); }
     if (strikeT > 0) { const sg = g.append("g").attr("opacity", gradT); const l1 = [[gx - 6, gy - 6], [gx + gw + 6, gy + gh + 6]], l2 = [[gx + gw + 6, gy - 6], [gx - 6, gy + gh + 6]];
       [l1, l2].forEach(([[x1, y1], [x2, y2]], i) => { const t = clamp01(strikeT * 2 - i); if (t > 0) sg.append("line").attr("x1", x1).attr("y1", y1).attr("x2", lerp(x1, x2, t)).attr("y2", lerp(y1, y2, t)).attr("stroke", INK).attr("stroke-width", 5).attr("stroke-linecap", "round"); });
-      sg.append("text").attr("x", gx + gw / 2).attr("y", gy + gh + 26).attr("text-anchor", "middle").attr("font-size", 12.5).attr("font-style", "italic").attr("fill", INK).attr("opacity", strikeT).text("the representation never sees the grader"); }
+      sg.append("text").attr("x", gx + gw / 2).attr("y", gy + gh + 26).attr("text-anchor", "middle").attr("font-size", 12.5).attr("font-style", "italic").attr("fill", INK).attr("opacity", strikeT).text("without the grader"); }
   }
   // scanning band over the attempt
   if (scanT > 0 && scanT < 1) g.append("rect").attr("x", lerp(tx0, tx1, scanT) - 14).attr("y", cy - ch / 2 - 10).attr("width", 28).attr("height", ch + 20).attr("rx", 6).attr("fill", ACT).attr("opacity", 0.18);
@@ -157,7 +157,7 @@ function attemptScene(svg, f) {
   // only the actions and observations remain
   if (glowT > 0) { const gl = g.append("g").attr("opacity", glowT);
     gl.append("rect").attr("x", tx0 - 10).attr("y", cy - ch / 2 - 10).attr("width", tx1 - tx0 + 20).attr("height", ch + 20).attr("rx", 10).attr("fill", "none").attr("stroke", ACT).attr("stroke-width", 2.5);
-    gl.append("text").attr("x", tx0 - 6).attr("y", cy + ch / 2 + 28).attr("font-size", 13).attr("font-weight", 700).attr("fill", ACT).text("what we do get: the actions and observations"); }
+    gl.append("text").attr("x", tx0 - 6).attr("y", cy + ch / 2 + 28).attr("font-size", 13).attr("font-weight", 700).attr("fill", ACT).text("only the actions and observations"); }
 }
 
 // ---------- beats ----------
@@ -259,9 +259,12 @@ function tokensUpTo(r, upto) { let n = 0; for (let t = 0; t < Math.min(upto, r.n
 window.PrecogTokens = tokensUpTo;
 function bindText() { const r = D.pairFP.f, gr = r.grader;
   document.querySelectorAll('[data-bind="n-steps"]').forEach(el => el.textContent = r.n_steps);
-  document.querySelectorAll('[data-bind="grader-summary"]').forEach(el => { if (!gr) { el.textContent = D.pass(r) ? "it passed" : "it failed"; return; }
-    const ok = gr.basis.filter(b => (gr.breakdown[b] ?? 0) >= 0.5).map(b => BASIS_LABEL[b] || b), bad = gr.basis.filter(b => (gr.breakdown[b] ?? 0) < 0.5).map(b => BASIS_LABEL[b] || b);
-    el.textContent = (ok.length ? `${ok.join(" and ")}: right. ` : "") + (bad.length ? `${bad.join(" and ")}: wrong. ` : "") + (D.pass(r) ? "Passed." : "Failed."); }); }
+  const OK = { DB: "the database ended up right", COMMUNICATE: "the user got the information they needed", ACTION: "every required action was taken", NL_ASSERTION: "the behaviour checks passed", ENV_ASSERTION: "the environment checks passed" };
+  const BAD = { DB: "the database ended up wrong", COMMUNICATE: "the user never got information they needed", ACTION: "a required action was missed", NL_ASSERTION: "a behaviour check failed", ENV_ASSERTION: "an environment check failed" };
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  document.querySelectorAll('[data-bind="grader-summary"]').forEach(el => { if (!gr) { el.textContent = ""; return; }
+    const ok = gr.basis.filter(b => (gr.breakdown[b] ?? 0) >= 0.5).map(b => OK[b] || `${b.toLowerCase()} passed`), bad = gr.basis.filter(b => (gr.breakdown[b] ?? 0) < 0.5).map(b => BAD[b] || `${b.toLowerCase()} failed`);
+    el.textContent = cap(ok.length && bad.length ? `${ok.join(" and ")}, but ${bad.join(" and ")}.` : `${(bad.length ? bad : ok).join(" and ")}.`); }); }
 function load(b) { B = b; D = prep(b); bindText(); document.dispatchEvent(new CustomEvent("precog:opening")); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);

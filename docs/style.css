@@ -165,3 +165,6 @@ body.scrolly { background:#f7f7f5; }
 .beat .card { max-width:calc(var(--lane) - max(24px, 4vw) - 24px); }
 .beat.wide .card, .beat.hero .card { max-width:calc(var(--lane) - max(24px, 4vw) - 24px); }
 @media (max-width: 899px) { .beat .card, .beat.wide .card, .beat.hero .card { max-width:none; } }
+.beat .card b.fail { color:#d13b3b; }
+.beat .card p.small-text.muted { color:var(--muted); font-size:13.5px; }
+.beat .card p.big { font-size:22px; }

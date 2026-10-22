@@ -23,14 +23,34 @@
 
 <main class="wrap">
 
-<section class="scene" id="s1" data-title="Sixteen attempts">
-  <div class="copy"><h2>Same task, sixteen attempts.<br>Some succeed. Some don't.</h2><p>The outcome is decided along the way.</p></div>
-  <div class="visual"><svg class="loop" data-from="0.14" data-to="0.22" data-seconds="9" data-hold="2"></svg></div>
+<section class="scene" id="o1" data-title="One attempt">
+  <div class="copy"><h2>One attempt.</h2><p>An agent works through a task, action by action, observation by observation. It fails.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o1" data-seconds="11" data-hold="2.5"></svg></div>
 </section>
 
-<section class="scene" id="s2" data-title="A rollout is a path">
-  <div class="copy"><h2>A rollout is a path.</h2><p>Each step is an action and the observation it provokes. Embed them, group similar steps into states, and every attempt becomes a route through the same map.</p></div>
-  <div class="visual"><svg class="loop" data-from="0" data-to="0.38" data-seconds="18" data-hold="2"></svg></div>
+<section class="scene" id="o2" data-title="The branch">
+  <div class="copy"><h2>Rewind. Choose differently at one step.</h2><p>Same states up to that step, a different action, and the outcome flips. That step is a critical branch point.</p><p class="small-text muted">Two real rollouts of the task that share their first states.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o2" data-seconds="12" data-hold="3"></svg></div>
+</section>
+
+<section class="scene" id="o3" data-title="Mapping every path">
+  <div class="copy"><h2>Finding every branch point means re-sampling at every step.</h2><p>Branches off branches off branches. The cost is exponential in the length of the task.</p><p class="small-text muted">Schematic.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o3" data-seconds="12" data-hold="3"></svg></div>
+</section>
+
+<section class="scene" id="o4" data-title="What we can afford">
+  <div class="copy"><h2>What we can afford: fifty independent rollouts.</h2><p>Different actions at different moments, a mix of outcomes, and no two attempts share a branch point exactly.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o4" data-seconds="10" data-hold="2.5"></svg></div>
+</section>
+
+<section class="scene" id="o5" data-title="But they share states">
+  <div class="copy"><h2>But they share states.</h2><p>Many actions and observations are near-duplicates. Cluster them by semantic similarity and every rollout becomes a route through one map of behavior states.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o5" data-seconds="12" data-hold="3"></svg></div>
+</section>
+
+<section class="scene" id="o6" data-title="Every rollout strengthens the map">
+  <div class="copy"><h2>Every rollout strengthens the map.</h2><p>Each new rollout mostly reinforces edges, tinting them toward success or failure; now and then it adds a state. The branch points surface without re-sampling.</p></div>
+  <div class="visual"><svg class="loop" data-kind="o6" data-seconds="16" data-hold="4"></svg></div>
 </section>
 
 <section class="scene" id="s3" data-title="The path already knows">
@@ -133,6 +153,7 @@
 <script src="app.js?v=7"></script>
 <script src="charts.js?v=7"></script>
 <script src="pipeline.js?v=31"></script>
-<script src="story.js?v=2"></script>
+<script src="opening.js?v=2"></script>
+<script src="story.js?v=3"></script>
 </body>
 </html>

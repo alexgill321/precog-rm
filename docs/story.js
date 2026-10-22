@@ -53,7 +53,8 @@ function drawGrpoLoop(svgNode, frac) {
 function makeLoop(svg) {
   const from = +svg.dataset.from, to = +svg.dataset.to, secs = +svg.dataset.seconds || 10, hold = +svg.dataset.hold || 1.5, kind = svg.dataset.kind || "scene";
   let start = null, raf = null, playing = false;
-  const draw = (frac) => { if (!S) return; if (kind === "grpo") drawGrpoLoop(svg, frac); else window.PrecogPipeline.renderScene(svg, S, from + (to - from) * frac); };
+  const draw = (frac) => { if (kind.startsWith("o")) { if (window.PrecogOpening && window.PrecogOpening.data) window.PrecogOpening.draw(kind, svg, frac); return; }
+    if (!S) return; if (kind === "grpo") drawGrpoLoop(svg, frac); else window.PrecogPipeline.renderScene(svg, S, from + (to - from) * frac); };
   const tick = (now) => { if (!playing) return; if (start == null) start = now; const e = ((now - start) / 1000) % (secs + hold); draw(Math.min(1, e / secs)); raf = requestAnimationFrame(tick); };
   const play = () => { if (playing) return; playing = true; start = null; raf = requestAnimationFrame(tick); };
   const stop = () => { playing = false; if (raf) cancelAnimationFrame(raf); };
@@ -64,6 +65,7 @@ function makeLoop(svg) {
 }
 document.querySelectorAll("svg.loop").forEach(svg => loops.push(makeLoop(svg)));
 document.addEventListener("precog:scene", (e) => { S = e.detail; loops.forEach(l => l.draw()); });
+document.addEventListener("precog:opening", () => loops.forEach(l => l.draw()));
 if (window.PrecogPipeline && window.PrecogPipeline.scene) { S = window.PrecogPipeline.scene; loops.forEach(l => l.draw()); }
 
 // ---------- collapsed panels redraw when opened; scene rail ----------

@@ -9,7 +9,7 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x)), sub = (q, a, b) => clamp01((
 
 // ---------- one GRPO group with the controller (scene 9) ----------
 function drawGrpoLoop(svgNode, frac) {
-  const W = 900, H = 440, svg = d3.select(svgNode); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const W = 900, H = 440, svg = d3.select(svgNode); svg.selectAll("*").remove(); if (svgNode.tagName === "svg") svg.attr("viewBox", `0 0 ${W} ${H}`);
   const B = window.PRECOG_BUNDLE, E = B.encoders.prefix, idx = new Map(B.rollouts.map((r, i) => [r.rid, i]));
   const group = B.rollouts.filter(r => !S.supIds.has(r.rid)).slice(0, 16), thr = 0.8;
   const stops = group.map(r => { const z = E.z[idx.get(r.rid)]; for (let t = 3; t < z.length; t++) { const p = S.score(z[t]); if (p > thr || 1 - p > thr) return { t, pred: p > thr }; } return { t: null, pred: null }; });
@@ -64,7 +64,8 @@ function makeLoop(svg) {
   return { draw: () => draw(0), svg };
 }
 document.querySelectorAll("svg.loop").forEach(svg => loops.push(makeLoop(svg)));
-document.addEventListener("precog:scene", (e) => { S = e.detail; loops.forEach(l => l.draw()); });
+window.PrecogStory = { drawGrpoLoop, get scene() { return S; } };
+document.addEventListener("precog:scene", (e) => { S = e.detail; loops.forEach(l => l.draw()); document.dispatchEvent(new CustomEvent("precog:story")); });
 document.addEventListener("precog:opening", () => loops.forEach(l => l.draw()));
 if (window.PrecogPipeline && window.PrecogPipeline.scene) { S = window.PrecogPipeline.scene; loops.forEach(l => l.draw()); }
 

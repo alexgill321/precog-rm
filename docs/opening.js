@@ -141,10 +141,13 @@ const beats = {
     if (reveal > 0) g.append("text").attr("x", 450).attr("y", 432).attr("text-anchor", "middle").attr("font-size", 14).attr("fill", ACT).attr("font-weight", 700).attr("opacity", reveal).text(`${D.branchPts.length} branch points surface, from ${N} rollouts, without re-sampling`); },
 };
 
-function draw(kind, svgNode, frac) {
-  if (!D) return; const svg = d3.select(svgNode); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+function draw(kind, node, frac) {
+  if (!D) return; const svg = d3.select(node); svg.selectAll("*").remove(); if (node.tagName === "svg") svg.attr("viewBox", `0 0 ${W} ${H}`);
   if (beats[kind]) beats[kind](svg, frac);
 }
+// token estimate for the focus rollout's first steps (chars / 4), for the hero counter
+function tokensUpTo(r, upto) { let n = 0; for (let t = 0; t < Math.min(upto, r.n_steps); t++) n += (r.steps[t].a.length + r.steps[t].o.length) / 4; return Math.round(n); }
+window.PrecogTokens = tokensUpTo;
 function load(b) { B = b; D = prep(b); document.dispatchEvent(new CustomEvent("precog:opening")); }
 document.addEventListener("precog:bundle", (e) => load(e.detail));
 if (window.PRECOG_BUNDLE) load(window.PRECOG_BUNDLE);

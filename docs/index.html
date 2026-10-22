@@ -4,156 +4,159 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Divergent Paths</title>
-<meta name="description" content="Precog-RM: an outcome-predictive representation of LLM agent trajectories, told as a short interactive story.">
-<link rel="stylesheet" href="style.css?v=7">
+<meta name="description" content="Precog-RM: an outcome-predictive representation of LLM agent trajectories, told as a story on one task.">
+<link rel="stylesheet" href="style.css?v=9">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
-<body class="story">
-<nav class="rail" aria-label="Scenes"></nav>
+<body class="stagepage">
+<svg id="progress" aria-hidden="true"></svg>
 
-<header class="hero">
-  <div class="wrap">
-    <p class="kicker">Precog-RM · arXiv 2610.19614</p>
-    <h1>Divergent Paths</h1>
-    <p class="sub">Learning an outcome-predictive representation of LLM agent trajectories</p>
-    <p class="authors">Alexander Gill, Guram Gogia, Francisco Guzmán &nbsp;·&nbsp; <span class="aff">Handshake AI · University of Utah</span></p>
-    <p class="links"><a class="btn" href="https://arxiv.org/abs/2610.19614">Paper</a><a class="btn" href="https://github.com/alexgill321/precog-rm">Code</a><a class="btn" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data</a></p>
-  </div>
-</header>
+<div class="stage-wrap">
+<div class="story">
 
-<main class="wrap">
-
-<section class="scene" id="o1" data-title="One attempt">
-  <div class="copy"><h2>One attempt.</h2><p>An agent works through a task, action by action, observation by observation. It fails.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o1" data-seconds="11" data-hold="2.5"></svg></div>
-</section>
-
-<section class="scene" id="o2" data-title="The branch">
-  <div class="copy"><h2>Rewind. Choose differently at one step.</h2><p>Same states up to that step, a different action, and the outcome flips. That step is a critical branch point.</p><p class="small-text muted">Two real rollouts of the task that share their first states.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o2" data-seconds="12" data-hold="3"></svg></div>
-</section>
-
-<section class="scene" id="o3" data-title="Mapping every path">
-  <div class="copy"><h2>Finding every branch point means re-sampling at every step.</h2><p>Branches off branches off branches. The cost is exponential in the length of the task.</p><p class="small-text muted">Schematic.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o3" data-seconds="12" data-hold="3"></svg></div>
-</section>
-
-<section class="scene" id="o4" data-title="What we can afford">
-  <div class="copy"><h2>What we can afford: fifty independent rollouts.</h2><p>Different actions at different moments, a mix of outcomes, and no two attempts share a branch point exactly.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o4" data-seconds="10" data-hold="2.5"></svg></div>
-</section>
-
-<section class="scene" id="o5" data-title="But they share states">
-  <div class="copy"><h2>But they share states.</h2><p>Many actions and observations are near-duplicates. Cluster them by semantic similarity and every rollout becomes a route through one map of behavior states.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o5" data-seconds="12" data-hold="3"></svg></div>
-</section>
-
-<section class="scene" id="o6" data-title="Every rollout strengthens the map">
-  <div class="copy"><h2>Every rollout strengthens the map.</h2><p>Each new rollout mostly reinforces edges, tinting them toward success or failure; now and then it adds a state. The branch points surface without re-sampling.</p></div>
-  <div class="visual"><svg class="loop" data-kind="o6" data-seconds="16" data-hold="4"></svg></div>
-</section>
-
-<section class="scene" id="s3" data-title="The path already knows">
-  <div class="copy"><h2>The path already knows how it ends.</h2><p>Fit a simple classifier on one task's rollouts and it predicts held-out outcomes. Successes and failures separate in the raw action–observation space and in the state map.</p>
-    <div class="numbers" id="n2"></div></div>
-  <div class="visual"><svg class="loop" data-from="0.30" data-to="0.38" data-seconds="9" data-hold="3"></svg>
-    <div class="controls small"><label><input type="radio" name="t1" value="best" checked> best per-task classifier</label><label><input type="radio" name="t1" value="PN"> Precog-RM</label></div>
-    <div id="table1" class="chart"></div></div>
-  <details class="inside"><summary>Look inside: the state map of one task</summary>
-    <div class="controls small">
-      <label>Steps shown <input id="flow-steps" type="range" min="2" max="30" value="30"> <span id="flow-steps-val">30</span></label>
-      <label><input id="flow-collapse" type="checkbox"> collapse uniform steps</label>
-      <span class="legend"><i class="sw pass"></i>pass <i class="sw fail"></i>fail <i class="sw grad"></i>state success rate 0→1 <i class="sw noise"></i>outlier bin</span>
+  <section class="act hero" data-act="hero">
+    <div class="title-card">
+      <p class="kicker">Precog-RM · arXiv 2610.19614</p>
+      <h1>We set out to learn a representation that captures the critical behavioral patterns of agents on long-horizon, tool-calling tasks.</h1>
+      <p class="authors">Alexander Gill, Guram Gogia, Francisco Guzmán · Handshake AI · University of Utah</p>
+      <p class="links"><a class="btn" href="https://arxiv.org/abs/2610.19614">Paper</a><a class="btn" href="https://github.com/alexgill321/precog-rm">Code</a><a class="btn" href="https://huggingface.co/collections/agill32/precog-rm-6acea7006164a34201b36bf8">Data</a></p>
     </div>
+    <div class="body"><p>An agentic trajectory pairs each action with the observation it provokes, for ten to a hundred turns and up to half a million tokens. The tokens that decide the outcome are a small fraction of the ones that carry it.</p>
+      <p class="lands">Here is what we found, on one task, fifty attempts at a time.</p><p class="hinge">Start with one attempt. ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act1">
+    <div class="title-card"><span class="n">1</span><h2>One attempt.</h2></div>
+    <div class="body"><div class="num" data-n="20" data-fmt="int">0</div><p class="numlabel">steps before it failed</p>
+      <p>The agent looks up the customer, reads the order, processes a return, keeps going. It fails. Rewind, keep the same first states, choose differently at one step, and it succeeds.</p>
+      <p class="lands">That step is a critical branch point.</p>
+      <p class="small-text muted">Two real rollouts of the task that share their first states.</p>
+      <p class="hinge">Could we have seen it coming? ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act2">
+    <div class="title-card"><span class="n">2</span><h2>The map.</h2></div>
+    <div class="body"><div class="num" data-n="6561" data-fmt="int">0</div><p class="numlabel">rollouts to re-sample eight steps, three ways each</p>
+      <p>Finding every branch point by re-sampling is exponential. What we can afford is fifty independent attempts. But actions and observations repeat: the same lookup, the same refusal, the same confirmation, in different words. Cluster them by meaning and fifty attempts draw one map of behavior states.</p>
+      <p>Each new rollout mostly thickens edges it shares with earlier ones, tinting them toward success or failure. Now and then it adds a state.</p>
+      <p class="lands">The branch points surface without re-sampling.</p>
+      <p class="hinge">If the map keeps the outcome, a simple classifier should find it. ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act3">
+    <div class="title-card"><span class="n">3</span><h2>The finding.</h2></div>
+    <div class="body"><div class="num" data-n="0.95" data-fmt="dec">0</div><p class="numlabel">AUROC, best per-task classifier, held-out rollouts</p>
+      <p>Fit a nearest-centroid or an RBF classifier on one task's rollouts, or a fastText model on its state sequences, and it predicts the outcomes of rollouts it has not seen. Across three benchmarks and three policies.</p>
+      <p class="lands">Successes and failures separate along the path.</p>
+      <div class="controls small"><label><input type="radio" name="t1" value="best" checked> best per-task classifier</label><label><input type="radio" name="t1" value="PN"> Precog-RM</label></div>
+      <div id="table1" class="chart"></div>
+      <button class="inside" data-panel="flow">Look inside: the state map of one task</button>
+      <p class="hinge">Every task, though, needs its own classifier. ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act4">
+    <div class="title-card"><span class="n">4</span><h2>The obstacle.</h2></div>
+    <div class="body"><div class="num" data-n="33" data-fmt="int">0</div><p class="numlabel">labeled rollouts per task, and none of it carries over</p>
+      <p>A per-task classifier is capped by the labeled rollouts one task provides, and it knows nothing about the next task. Shrink the labels and it falls apart; change the task and it starts from zero.</p>
+      <div id="falloff" class="chart"></div>
+      <p class="lands">Per-task fitting transfers nothing.</p>
+      <p class="hinge">So learn the representation instead. ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act5">
+    <div class="title-card"><span class="n">5</span><h2>The idea.</h2></div>
+    <div class="body"><div class="num" data-n="128" data-fmt="int">0</div><p class="numlabel">dimensions per rollout, or any prefix of it</p>
+      <p>Precog-RM embeds each action and observation, projects them, and reads the whole sequence with a small transformer; mean pooling gives one point. It is meta-learned across many tasks and policies so that rollouts heading the same way land near each other.</p>
+      <p>On a new task, one batch of labeled rollouts becomes two prototypes, the mean of its passes and the mean of its failures. A rollout is scored by distance to them. Nothing is fitted at inference.</p>
+      <p class="lands">A rollout becomes a point; a batch becomes two prototypes.</p>
+      <button class="inside" data-panel="latent">Look inside: the latent space, your support set</button>
+      <p class="hinge">How few rollouts? How far does it carry? ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act6">
+    <div class="title-card"><span class="n">6</span><h2>The proof.</h2></div>
+    <div class="body"><div class="num" data-n="2" data-fmt="int">0</div><p class="numlabel">labeled rollouts per class match the per-task classifiers at eight</p>
+      <div id="fewshot" class="chart"></div>
+      <p>One encoder separates rollouts of policies it never saw; across benchmarks the transfer is partial and recovers once the benchmark joins the pool.</p>
+      <div id="gen-models" class="chart"></div>
+      <p>Trained on prefixes too, it scores a rollout while it runs. Gate on confidence and the prediction becomes a decision.</p>
+      <div id="gating" class="chart"></div>
+      <p class="lands">Two per class. Unseen policies. Mid-rollout.</p>
+      <button class="inside" data-panel="prefix">Look inside: one rollout, step by step</button>
+      <p class="hinge">What is it good for? ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act7">
+    <div class="title-card"><span class="n">7</span><h2>The payoff.</h2></div>
+    <div class="body"><div class="num" data-n="47.3" data-fmt="pct">0</div><p class="numlabel">fewer training FLOPs, pass@1 within one std of baseline</p>
+      <p>Inside GRPO, rollouts that cross the confidence threshold are terminated and handed the predicted outcome as their reward. The optimizer is untouched.</p>
+      <div id="grpo-frontier" class="chart"></div>
+      <p class="lands">Stop the rollouts that are already decided.</p>
+      <button class="inside" data-panel="grpo">Look inside: the training runs</button>
+      <p class="hinge">Back to the thesis. ↓</p></div>
+  </section>
+
+  <section class="act" data-act="act8">
+    <div class="title-card"><span class="n">8</span><h2>A representation that keeps the outcome, and carries it.</h2></div>
+    <div class="body"><p>Same-task outcomes are separable in embedded action–observation sequences; Precog-RM carries that signal to unseen tasks and policies from a single batch; it predicts mid-rollout and abstains when the signal is absent; and as a GRPO controller it cuts training FLOPs by up to 47.3% at near-baseline pass@1.</p>
+      <p class="lands">Now run it again on a task you choose.</p>
+      <button class="inside" data-panel="explore">Pick another task</button>
+      <pre class="cite">@article{gill2026divergent,
+  title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
+  author  = {Gill, Alexander and Gogia, Guram and Guzm\'an, Francisco},
+  journal = {arXiv preprint arXiv:2610.19614}, year = {2026}, url = {http://arxiv.org/abs/2610.19614}
+}</pre></div>
+  </section>
+
+</div>
+<aside class="stage"><svg id="stage" viewBox="0 0 900 440"></svg><p class="stage-note" id="load-status">Loading…</p></aside>
+</div>
+
+<div id="drawer" aria-label="Look inside">
+  <button id="drawer-close">close ✕</button>
+  <div class="drawer-panel" data-panel="flow">
+    <h3>The state map of one task</h3>
+    <div class="controls small"><label>Steps shown <input id="flow-steps" type="range" min="2" max="30" value="30"> <span id="flow-steps-val">30</span></label><label><input id="flow-collapse" type="checkbox"> collapse uniform steps</label>
+      <span class="legend"><i class="sw pass"></i>pass <i class="sw fail"></i>fail <i class="sw grad"></i>state success rate 0→1 <i class="sw noise"></i>outlier bin</span></div>
     <div class="split"><div class="grow"><svg id="flow"></svg></div><aside id="cluster-panel" class="panel"><p class="muted">Click a bar to read the action–observation pairs in that state.</p></aside></div>
     <div class="numbers" id="n1"></div>
-  </details>
-</section>
-
-<section class="scene" id="s4" data-title="But it doesn't travel">
-  <div class="copy"><h2>But that knowledge doesn't travel.</h2><p>A per-task classifier needs around thirty labeled rollouts of <em>that</em> task, and it knows nothing about the next one.</p></div>
-  <div class="visual"><div id="falloff" class="chart"></div></div>
-</section>
-
-<section class="scene" id="s5" data-title="Meet Precog-RM">
-  <div class="copy"><h2>Meet Precog-RM.</h2><p>A small transformer, meta-learned across many tasks and policies, turns a rollout or any prefix of it into one point. Nothing is fitted on a new task.</p></div>
-  <div class="visual"><svg class="loop" data-from="0.38" data-to="0.66" data-seconds="24" data-hold="2"></svg></div>
-</section>
-
-<section class="scene" id="s6" data-title="A few rollouts are enough">
-  <div class="copy"><h2>A few labeled rollouts are enough.</h2><p>Their means are the pass and fail prototypes. A new rollout is scored by distance. With two labeled rollouts per class, Precog-RM matches the per-task classifiers at eight.</p>
-    <div class="numbers" id="n4"></div></div>
-  <div class="visual"><svg class="loop" data-from="0.66" data-to="1" data-seconds="20" data-hold="2"></svg><div id="fewshot" class="chart"></div></div>
-  <details class="inside"><summary>Look inside: the latent space, your support set</summary>
-    <div class="controls small">
-      <label>Encoder <select id="sel-encoder"></select></label>
-      <label>Support set <select id="sel-support">
-        <option value="cv0">3-fold CV: fold 1 held out</option><option value="cv1">3-fold CV: fold 2 held out</option><option value="cv2">3-fold CV: fold 3 held out</option>
-        <option value="k1">k=1 per class</option><option value="k2">k=2 per class</option><option value="k4">k=4 per class</option><option value="k8">k=8 per class</option><option value="custom">custom</option></select></label>
-      <label>k <input id="k-slider" type="range" min="0" max="3" value="3"> <span id="k-val">8</span></label>
-      <span id="score-badges" class="badges"></span>
-    </div>
+  </div>
+  <div class="drawer-panel" data-panel="latent">
+    <h3>The latent space, your support set</h3>
+    <div class="controls small"><label>Encoder <select id="sel-encoder"></select></label>
+      <label>Support set <select id="sel-support"><option value="cv0">3-fold CV: fold 1 held out</option><option value="cv1">3-fold CV: fold 2 held out</option><option value="cv2">3-fold CV: fold 3 held out</option><option value="k1">k=1 per class</option><option value="k2">k=2 per class</option><option value="k4">k=4 per class</option><option value="k8">k=8 per class</option><option value="custom">custom</option></select></label>
+      <label>k <input id="k-slider" type="range" min="0" max="3" value="3"> <span id="k-val">8</span></label><span id="score-badges" class="badges"></span></div>
     <p class="hint">Click a rollout to select it; shift-click to move it in or out of the support set.</p>
     <div class="split"><div class="grow"><svg id="latent"></svg></div><aside class="panel"><svg id="strip"></svg><div id="auroc-table"></div></aside></div>
     <div class="numbers" id="n3"></div>
-  </details>
-</section>
-
-<section class="scene" id="s7" data-title="It generalizes">
-  <div class="copy"><h2>It generalizes.</h2><p>One encoder separates rollouts of policies it never saw. Across benchmarks the transfer is partial, and recovers once the benchmark joins the training pool.</p></div>
-  <div class="visual"><div id="gen-models" class="chart"></div><div id="gen-bench" class="chart"></div></div>
-</section>
-
-<section class="scene" id="s8" data-title="It can tell before the end">
-  <div class="copy"><h2>It can tell before the end.</h2><p>Trained on prefixes too, it scores a rollout while it is running. Gate on confidence and the prediction becomes a decision: stop, or keep going.</p>
-    <div class="numbers" id="n5"></div></div>
-  <div class="visual"><svg class="loop" data-from="0.78" data-to="1" data-seconds="14" data-hold="2"></svg><div id="gating" class="chart"></div></div>
-  <details class="inside"><summary>Look inside: one rollout, step by step</summary>
-    <div class="controls small">
-      <label>Prefix length <input id="prefix-t" type="range" min="1" max="1" value="1"> <span id="prefix-t-val"></span></label>
-      <label>θ <input id="theta" type="range" min="0.55" max="0.95" step="0.05" value="0.8"> <span id="theta-val">0.80</span></label>
-    </div>
+  </div>
+  <div class="drawer-panel" data-panel="prefix">
+    <h3>One rollout, step by step</h3>
+    <div class="controls small"><label>Prefix length <input id="prefix-t" type="range" min="1" max="1" value="1"> <span id="prefix-t-val"></span></label><label>θ <input id="theta" type="range" min="0.55" max="0.95" step="0.05" value="0.8"> <span id="theta-val">0.80</span></label></div>
     <p id="sel-readout" class="readout"></p>
-    <div class="split"><div class="grow"><svg id="curve"></svg><p id="theta-readout" class="readout small-text"></p></div><aside class="panel"><div id="sel-steps" class="steps"></div></aside></div>
-  </details>
-</section>
-
-<section class="scene" id="s9" data-title="Inside GRPO">
-  <div class="copy"><h2>Inside GRPO, that saves compute.</h2><p>Rollouts that cross the threshold are terminated and given the predicted reward. The optimizer is untouched.</p>
-    <div class="numbers" id="n6"></div></div>
-  <div class="visual"><svg class="loop" data-kind="grpo" data-seconds="10" data-hold="3"></svg><div id="grpo-frontier" class="chart"></div></div>
-  <details class="inside"><summary>Look inside: the training runs</summary>
+    <div class="split"><div class="grow"><svg id="curve"></svg><p id="theta-readout" class="readout small-text"></p><div id="gen-bench" class="chart"></div></div><aside class="panel"><div id="sel-steps" class="steps"></div></aside></div>
+  </div>
+  <div class="drawer-panel" data-panel="grpo">
+    <h3>The training runs</h3>
     <div class="controls small" id="grpo-toggles"></div>
     <div class="charts3"><div id="grpo-reward" class="chart"></div><div id="grpo-pass" class="chart"></div><div id="grpo-flops" class="chart"></div></div>
-  </details>
-</section>
-
-<section class="scene" id="s10" data-title="Explore">
-  <div class="copy"><h2>Explore the release.</h2><p>Every loop above is computed from one task's released rollouts, embeddings and encoders. Pick another task and the page redraws for it.</p></div>
-  <div class="visual">
-    <div class="controls" id="explore"><label>Benchmark <select id="sel-benchmark"></select></label><label>Policy <select id="sel-policy"></select></label><label>Task <select id="sel-task"></select></label></div>
-    <p class="hint" id="load-status">Loading…</p><p id="task-badges" class="badges"></p>
-    <p class="small-text muted">50 rollouts per task · 200 Tau2-Bench, 200 BFCLv3 and 214 AgentClinic tasks · three policies · 21 GRPO runs · all checkpoints. <code>python scripts/download.py --part ...</code></p>
+    <div class="numbers" id="n6"></div>
   </div>
-</section>
+  <div class="drawer-panel" data-panel="explore">
+    <h3>Pick another task</h3>
+    <div class="controls" id="explore"><label>Benchmark <select id="sel-benchmark"></select></label><label>Policy <select id="sel-policy"></select></label><label>Task <select id="sel-task"></select></label></div>
+    <p id="task-badges" class="badges"></p>
+    <p class="small-text muted">Every act redraws for the chosen task. 50 rollouts per task · 200 Tau2-Bench, 200 BFCLv3 and 214 AgentClinic tasks · three policies. <code>python scripts/download.py --part ...</code></p>
+    <div class="numbers" id="n2"></div><div class="numbers" id="n4"></div><div class="numbers" id="n5"></div>
+  </div>
+</div>
 
-<section class="scene cite" id="cite" data-title="Cite">
-  <div class="copy"><h2>Cite</h2><p class="small-text muted">Reproduce any figure: <code>scripts/print_table1.py</code>, <code>print_fewshot_table.py</code>, <code>aggregate_generalization.py</code>, <code>fig_prefix_gated.py</code>, <code>table_grpo.py</code>, <code>fig_grpo_curves.py</code>.</p></div>
-  <div class="visual"><pre>@article{gill2026divergent,
-  title   = {Divergent Paths: Learning an Outcome-Predictive Representation of LLM Agent Trajectories},
-  author  = {Gill, Alexander and Gogia, Guram and Guzm\'an, Francisco},
-  journal = {arXiv preprint arXiv:2610.19614},
-  year    = {2026},
-  url     = {http://arxiv.org/abs/2610.19614}
-}</pre></div>
-</section>
-
-</main>
 <script src="icons.js?v=1"></script>
-<script src="app.js?v=7"></script>
-<script src="charts.js?v=7"></script>
-<script src="pipeline.js?v=31"></script>
-<script src="opening.js?v=2"></script>
-<script src="story.js?v=3"></script>
+<script src="app.js?v=9"></script>
+<script src="charts.js?v=8"></script>
+<script src="pipeline.js?v=32"></script>
+<script src="opening.js?v=3"></script>
+<script src="story.js?v=4"></script>
+<script src="stage.js?v=1"></script>
 </body>
 </html>

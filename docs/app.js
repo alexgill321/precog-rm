@@ -79,7 +79,7 @@ window.addEventListener("resize", () => { if (B) { drawFlow(); drawScoring(false
 // ---------- 1. behavior-state flow ----------
 function drawFlow() {
   const svg = d3.select("#flow"); svg.selectAll("*").remove();
-  const W = svg.node().clientWidth, H = svg.node().clientHeight;
+  const W = svg.node().clientWidth || 700, H = svg.node().clientHeight || 520;
   const m = { l: 36, r: 12, t: 10, b: 34 };
   const rolls = B.rollouts, byRid = new Map(rolls.map(r => [r.rid, r]));
   const pass = new Map(rolls.map(r => [r.rid, r.reward >= 0.5]));
@@ -237,7 +237,7 @@ function drawScoring(resetT = true) {
 
 function drawLatent(E, rolls, idx, pass, cp, cf, score, zs) {
   const svg = d3.select("#latent"); svg.selectAll("*").remove();
-  const W = svg.node().clientWidth, H = svg.node().clientHeight, m = 28;
+  const W = svg.node().clientWidth || 600, H = svg.node().clientHeight || 460, m = 28;
   const pts = rolls.map(r => { const [px, py] = proj(zFinal(idx.get(r.rid))); return { rid: r.rid, x: px, y: py, pass: pass.get(r.rid), sup: S.support.has(r.rid) }; });
   const trail = E.prefix ? zs.map(z => proj(z)) : [];
   // fit the view to the full-rollout cloud; prefix trails may wander outside and are clipped
@@ -278,7 +278,7 @@ const pad = ([a, b]) => { const d = (b - a) || 1; return [a - 0.08 * d, b + 0.08
 function drawCurve(curve, thr, isPrefix, stopAt) {
   const svg = d3.select("#curve"); svg.selectAll("*").remove();
   if (!isPrefix) { svg.append("text").attr("x", 10).attr("y", 24).attr("font-size", 12).attr("fill", "#6b6b6b").text("The generalist encoder was trained on complete rollouts only and is at chance on prefixes (Sec. 4.5); pick the prefix-trained encoder to see P(pass) evolve."); return; }
-  const W = svg.node().clientWidth, H = svg.node().clientHeight, m = { l: 36, r: 12, t: 8, b: 24 };
+  const W = svg.node().clientWidth || 600, H = svg.node().clientHeight || 170, m = { l: 36, r: 12, t: 8, b: 24 };
   const x = d3.scaleLinear().domain([1, curve.length]).range([m.l, W - m.r]), y = d3.scaleLinear().domain([0, 1]).range([H - m.b, m.t]);
   svg.append("rect").attr("x", m.l).attr("y", y(1)).attr("width", W - m.l - m.r).attr("height", y(thr) - y(1)).attr("fill", PASS).attr("fill-opacity", 0.08);
   svg.append("rect").attr("x", m.l).attr("y", y(1 - thr)).attr("width", W - m.l - m.r).attr("height", y(0) - y(1 - thr)).attr("fill", FAIL).attr("fill-opacity", 0.08);
@@ -293,7 +293,7 @@ function drawCurve(curve, thr, isPrefix, stopAt) {
 
 function drawStrip(queries, qs, ql) {
   const svg = d3.select("#strip"); svg.selectAll("*").remove();
-  const W = svg.node().clientWidth, H = svg.node().clientHeight, m = { l: 10, r: 10, t: 10, b: 22 };
+  const W = svg.node().clientWidth || 320, H = svg.node().clientHeight || 150, m = { l: 10, r: 10, t: 10, b: 22 };
   const x = d3.scaleLinear().domain([0, 1]).range([m.l, W - m.r]);
   const nodes = queries.map((r, i) => ({ rid: r.rid, s: qs[i], pass: ql[i], x: x(qs[i]), y: H / 2 - 4 }));
   const sim = d3.forceSimulation(nodes).force("x", d3.forceX(d => x(d.s)).strength(1)).force("y", d3.forceY(H / 2 - 4).strength(0.1)).force("c", d3.forceCollide(5)).stop();

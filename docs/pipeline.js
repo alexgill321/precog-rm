@@ -117,7 +117,7 @@ const sub = (q, a, b) => clamp01((q - a) / (b - a));
 function render(p) { if (!scene) return; renderScene(document.querySelector("#pipeline"), scene, p, true); }
 function renderScene(svgNode, S, p, captions = false) {
   if (!svgNode || !S) return;
-  const svg = d3.select(svgNode); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const svg = d3.select(svgNode); svg.selectAll("*").remove(); if (svgNode.tagName === "svg") svg.attr("viewBox", `0 0 ${W} ${H}`);
   const [bi, q] = beatAt(p), g = svg.append("g");
   if (captions) { $("#pipeline-title").textContent = BEATS[bi].title; $("#pipeline-text").textContent = BEATS[bi].text;
     document.querySelectorAll("#pipeline-beats button").forEach((el, i) => el.classList.toggle("on", i === bi)); }

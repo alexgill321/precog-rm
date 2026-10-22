@@ -32,11 +32,11 @@ async function init() {
   // the scenes fetch a second task (act 4) through this
   window.PrecogData = { index: INDEX, url: (t) => `${DATA_BASE}/${t.benchmark}/${t.policy}/${t.task}.json?v=${DATA_V}` };
   document.dispatchEvent(new CustomEvent("precog:index"));
-  const q = new URLSearchParams(location.search);
-  if (q.get("task")) {
-    const t = INDEX.tasks.find(x => x.task === q.get("task"));
-    if (t) { $("#sel-benchmark").value = t.benchmark; refreshPolicies(); $("#sel-policy").value = t.policy; refreshTasks(); $("#sel-task").value = t.task; }
-  }
+  // the story is told on retail/103 unless the URL names another task (?task=<task>, optionally ?policy=<policy>)
+  const q = new URLSearchParams(location.search), STORY = { benchmark: "tau2", policy: "qwen3-80b", task: "retail_103" };
+  const t = (q.get("task") && (INDEX.tasks.find(x => x.task === q.get("task") && (!q.get("policy") || x.policy === q.get("policy"))) || INDEX.tasks.find(x => x.task === q.get("task"))))
+    || INDEX.tasks.find(x => x.benchmark === STORY.benchmark && x.policy === STORY.policy && x.task === STORY.task);
+  if (t) { $("#sel-benchmark").value = t.benchmark; refreshPolicies(); $("#sel-policy").value = t.policy; refreshTasks(); $("#sel-task").value = t.task; }
   await loadSelected();
 }
 function fill(sel, vals, labels) { sel.innerHTML = ""; vals.forEach((v, i) => { const o = document.createElement("option"); o.value = v; o.textContent = labels ? labels[i] : v; sel.appendChild(o); }); }
@@ -55,7 +55,7 @@ async function loadSelected() {
   setStatus(`Loading ${bm}/${pol}/${task}…`);
   B = await (await fetch(`${DATA_BASE}/${bm}/${pol}/${task}.json?v=${DATA_V}`)).json();
   setStatus("");
-  history.replaceState(null, "", `?task=${task}`);
+  history.replaceState(null, "", task === "retail_103" && pol === "qwen3-80b" ? location.pathname : `?task=${task}&policy=${pol}`);
   const maxT = d3.max(B.rollouts, r => r.n_steps);
   $("#task-badges").innerHTML = [
     `<span class="badge">${B.task_id}</span>`, `<span class="badge">${B.n_rollouts} rollouts</span>`,

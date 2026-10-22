@@ -5,7 +5,7 @@ const $ = (s) => document.querySelector(s);
 // Bundles live in the dataset repo (web/ part); a local build (scripts/build_web_bundles.py -> docs/data) is used when served from localhost.
 const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 const DATA_BASE = LOCAL ? "data" : "https://huggingface.co/datasets/agill32/precog-rm/resolve/main/web";
-const DATA_V = "5";   // bump when bundle contents change
+const DATA_V = "6";   // bump when bundle contents change
 const PASS = "#2a9d4a", FAIL = "#d13b3b", NOISE = "#b9b9b9", NOISE_STROKE = "#7b3fb3";
 const srColor = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1]);
 const fmt = d3.format(".2f"), fmt3 = d3.format(".3f");

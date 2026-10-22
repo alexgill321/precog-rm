@@ -41,6 +41,34 @@ MODELS = {
 }
 
 
+def raw_meta(d):
+    """The customer's opening message and a short grader breakdown, from the untouched harness record (tau2 format;
+    other harnesses fall back to None)."""
+    raw = d.get("raw") or {}
+    opening = None
+    for m in (raw.get("messages") or [])[:3]:
+        if isinstance(m, dict) and m.get("role") == "user" and isinstance(m.get("content"), str):
+            opening = m["content"][:600]; break
+    grader = None
+    ri = raw.get("reward_info")
+    if isinstance(ri, dict) and isinstance(ri.get("reward_breakdown"), dict):
+        failed = []
+        try:
+            for c in ri.get("communicate_checks") or []:
+                if not c.get("met", True): failed.append(c.get("justification") or f"required info not communicated: {c.get('info')}")
+            for c in ri.get("nl_assertions") or []:
+                if isinstance(c, dict) and not c.get("met", True): failed.append(c.get("justification") or c.get("nl_assertion"))
+            for c in ri.get("action_checks") or []:
+                if not c.get("action_match", True): failed.append(f"expected action not taken: {c['action'].get('name')}")
+            db = ri.get("db_check") or {}
+            if db and not db.get("db_match", True): failed.append("final database state differs from the goal")
+        except Exception:
+            pass
+        grader = {"basis": ri.get("reward_basis") or list(ri["reward_breakdown"]), "breakdown": ri["reward_breakdown"],
+                  "failed": [str(x)[:160] for x in failed if x][:3]}
+    return opening, grader
+
+
 def load_task(benchmark, policy, task):
     root = DATA / "rollouts" / benchmark / policy / task
     emb = DATA / "embeddings" / benchmark / policy / task
@@ -58,7 +86,8 @@ def load_task(benchmark, policy, task):
         a = np.stack([act[k].reshape(-1) for k in keys]).astype(np.float32)
         o = np.stack([obs[k].reshape(-1) for k in keys]).astype(np.float32)
         steps = [{"a": s["action"][:MAX_TEXT], "o": s["observation"][:MAX_TEXT]} for s in d["steps"]]
-        rollouts.append({"rid": rid, "reward": float(rewards.get(rid, d["reward"])), "steps": steps, "act": a, "obs": o})
+        opening, grader = raw_meta(d)
+        rollouts.append({"rid": rid, "reward": float(rewards.get(rid, d["reward"])), "steps": steps, "act": a, "obs": o, "opening": opening, "grader": grader})
     rollouts.sort(key=lambda r: r["rid"])
     return info, rollouts
 
@@ -177,7 +206,7 @@ def build(benchmark, policy, task, models, held_out):
         "cluster_protocol": {"method": "hdbscan", "min_cluster_size": MCS, "affinity": "0.5*(cos_action+cos_observation)", "noise": NOISE},
         "stop_threshold": STOP_THRESHOLD, "cv_folds": cv_folds(rollouts),
         "clusters": clusters,
-        "rollouts": [{"rid": r["rid"], "reward": r["reward"], "n_steps": len(r["steps"]), "steps": r["steps"]} for r in rollouts],
+        "rollouts": [{"rid": r["rid"], "reward": r["reward"], "n_steps": len(r["steps"]), "steps": r["steps"], "opening": r["opening"], "grader": r["grader"]} for r in rollouts],
         "encoders": enc,
     }
     out = OUT / benchmark / policy / f"{task}.json"

@@ -11,11 +11,9 @@ let curLayer = 0;
 const O = () => window.PrecogOpening, P = () => window.PrecogPipeline, ST = () => window.PrecogStory;
 const seg = (f, a, b) => sub(f, a, b);
 const ACTS = {
-  hero: { secs: 12, hold: 3, draw(g, f) { O().draw("o1", g, f); const D = O().data, r = D.pairFP.f, n = Math.min(12, r.n_steps), upto = Math.floor(sub(f, 0.05, 0.85) * n);
-    const tok = window.PrecogTokens(r, upto) * (r.n_steps / Math.max(1, n)); const t = d3.select(g).append("g").attr("transform", "translate(640,40)");
-    t.append("text").attr("font-size", 11).attr("fill", "#8a8a86").text("tokens so far"); t.append("text").attr("y", 30).attr("font-size", 26).attr("font-weight", 800).attr("fill", "#1c1c1c").text(d3.format(",")(Math.round(tok))); } },
-  act1: { secs: 24, hold: 3, draw(g, f) { if (f < 0.42) O().draw("o1", g, seg(f, 0, 0.42)); else O().draw("o2", g, seg(f, 0.42, 1)); } },
-  act2: { secs: 48, hold: 4, draw(g, f) { if (f < 0.22) O().draw("o3", g, seg(f, 0, 0.22)); else if (f < 0.42) O().draw("o4", g, seg(f, 0.22, 0.42)); else if (f < 0.66) O().draw("o5", g, seg(f, 0.42, 0.66)); else O().draw("o6", g, seg(f, 0.66, 1)); } },
+  hero: { secs: 3, hold: 30, draw(g, f) { O().draw("a1", g, 0.06 * f); } },
+  act1: { secs: 44, hold: 5, draw(g, f) { O().draw("a1", g, f); } },
+  act2: { secs: 62, hold: 4, draw(g, f) { if (f < 0.2) O().draw("o2", g, seg(f, 0, 0.2)); else if (f < 0.37) O().draw("o3", g, seg(f, 0.2, 0.37)); else if (f < 0.52) O().draw("o4", g, seg(f, 0.37, 0.52)); else if (f < 0.72) O().draw("o5", g, seg(f, 0.52, 0.72)); else O().draw("o6", g, seg(f, 0.72, 1)); } },
   act3: { secs: 9, hold: 3, draw(g, f) { P().renderScene(g, ST().scene, 0.30 + 0.08 * f); } },
   act4: { secs: 10, hold: 3, draw(g, f) { O().draw("o4", g, f); if (f > 0.9) { const t = d3.select(g).append("g").attr("opacity", sub(f, 0.9, 1)).attr("transform", "translate(640,40)");
     t.append("rect").attr("width", 230).attr("height", 54).attr("rx", 10).attr("fill", "#fff").attr("stroke", "#e3e3df"); t.append("text").attr("x", 14).attr("y", 22).attr("font-size", 11).attr("fill", "#8a8a86").text("to fit one classifier for this task");
@@ -23,7 +21,7 @@ const ACTS = {
   act5: { secs: 40, hold: 3, draw(g, f) { P().renderScene(g, ST().scene, 0.38 + 0.40 * f); } },
   act6: { secs: 16, hold: 3, draw(g, f) { P().renderScene(g, ST().scene, 0.78 + 0.22 * f); } },
   act7: { secs: 11, hold: 4, draw(g, f) { ST().drawGrpoLoop(g, f); } },
-  act8: { secs: 5, hold: 10, draw(g, f) { O().draw("o1", g, 1); } },
+  act8: { secs: 5, hold: 10, draw(g, f) { O().draw("o2", g, 1); } },
 };
 // ---------- playback ----------
 let current = null, start = null, raf = null, landed = new Set();

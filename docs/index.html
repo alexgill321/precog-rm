@@ -27,16 +27,18 @@
 
   <section class="act" data-act="act1">
     <div class="title-card"><span class="n">1</span><h2>One attempt.</h2></div>
-    <div class="body"><div class="num" data-n="20" data-fmt="int">0</div><p class="numlabel">steps before it failed</p>
-      <p>The agent looks up the customer, reads the order, processes a return, keeps going. It fails. Rewind, keep the same first states, choose differently at one step, and it succeeds.</p>
-      <p class="lands">That step is a critical branch point.</p>
-      <p class="small-text muted">Two real rollouts of the task that share their first states.</p>
-      <p class="hinge">Could we have seen it coming? ↓</p></div>
+    <div class="body"><div class="num" data-n="20" data-fmt="int">0</div><p class="numlabel">steps, then “Done!”</p>
+      <p>A customer writes in. The agent calls tools, reads what comes back, talks to the customer, and finally reports that it's done.</p>
+      <p>A grader checks the end state against the task's goal. The attempt failed.</p>
+      <p class="lands">Why it failed is somewhere in its actions and observations.</p>
+      <p class="hinge">Can we learn a representation of an agent's attempts that recovers that information, with no direct knowledge of how the attempt is scored? ↓</p></div>
   </section>
 
   <section class="act" data-act="act2">
     <div class="title-card"><span class="n">2</span><h2>The map.</h2></div>
     <div class="body"><div class="num" data-n="6561" data-fmt="int">0</div><p class="numlabel">rollouts to re-sample eight steps, three ways each</p>
+      <p>Rewind that attempt, keep its first states, choose differently at one step, and it succeeds. That step is a critical branch point.</p>
+      <p class="small-text muted">Two real rollouts of the task that share their first states.</p>
       <p>Finding every branch point by re-sampling is exponential. What we can afford is fifty independent attempts. But actions and observations repeat: the same lookup, the same refusal, the same confirmation, in different words. Cluster them by meaning and fifty attempts draw one map of behavior states.</p>
       <p>Each new rollout mostly thickens edges it shares with earlier ones, tinting them toward success or failure. Now and then it adds a state.</p>
       <p class="lands">The branch points surface without re-sampling.</p>
@@ -151,12 +153,12 @@
   </div>
 </div>
 
-<script src="icons.js?v=1"></script>
-<script src="app.js?v=9"></script>
+<script src="icons.js?v=2"></script>
+<script src="app.js?v=10"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=32"></script>
-<script src="opening.js?v=3"></script>
+<script src="opening.js?v=6"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=1"></script>
+<script src="stage.js?v=2"></script>
 </body>
 </html>

@@ -139,18 +139,20 @@
     <div class="card"><p>Mid-rollout, it calls an outcome only once it is confident, and holds off when the signal isn’t there.</p></div>
   </section>
   <section class="beat" data-scene="a6" data-f0="0.92" data-f1="1.0" data-secs="2" data-hold="4">
-    <div class="card"><p class="big">So many rollouts can be called before they end. During RL training, that is compute that never needs to be spent.</p>
-      <button class="inside" data-panel="prefix">Look inside: one rollout, step by step</button></div>
+    <div class="card"><p class="big">So many rollouts can be called before they end. During RL training, that is compute that never needs to be spent.</p></div>
   </section>
-  <section class="beat head wide" data-scene="act7" data-f0="0" data-f1="1" data-secs="11" data-hold="4">
-    <div class="card"><p class="act-n">7</p><h2>The payoff.</h2>
-<div class="num" data-n="47.3" data-fmt="pct">0</div><p class="numlabel">fewer training FLOPs, pass@1 within one std of baseline</p>
-      <p>Inside GRPO, rollouts that cross the confidence threshold are terminated and handed the predicted outcome as their reward. The optimizer is untouched.</p>
-      <div id="grpo-frontier" class="chart"></div>
-      <p class="lands">Stop the rollouts that are already decided.</p>
-      <button class="inside" data-panel="grpo">Look inside: the training runs</button>
-      <p class="hinge">Back to the thesis. ↓</p>
-    </div>
+  <section class="beat head" data-scene="a7" data-f0="0" data-f1="0.25" data-secs="6" data-hold="2.5">
+    <div class="card"><p class="act-n">7</p><h2>The payoff</h2><p>In GRPO training, an agent attempts each task in groups of rollouts. The first group on a task runs to the end, and its outcomes give the task’s two prototypes.</p></div>
+  </section>
+  <section class="beat" data-scene="a7" data-f0="0.25" data-f1="0.62" data-secs="10" data-hold="2.5">
+    <div class="card"><p>Every later rollout is scored after each step. Once its prediction is confident, the rollout stops and takes the predicted outcome as its reward.</p></div>
+  </section>
+  <section class="beat" data-scene="a7" data-f0="0.62" data-f1="0.9" data-secs="6" data-hold="3">
+    <div class="card"><p>Across training runs, this cuts the compute of training by up to</p>
+      <div class="num" data-n="47.3" data-fmt="pct">0</div><p class="numlabel">fewer training FLOPs, with the trained agent’s pass@1 within one standard deviation of standard GRPO</p></div>
+  </section>
+  <section class="beat" data-scene="a7" data-f0="0.9" data-f1="1.0" data-secs="2" data-hold="4">
+    <div class="card"><p class="big">Rollouts whose outcome is already decided never need to be finished, and the way the agent learns stays the same.</p></div>
   </section>
   <section class="beat head wide" data-scene="act8" data-f0="0" data-f1="1" data-secs="5" data-hold="10">
     <div class="card"><p class="act-n">8</p><h2>A representation that keeps the outcome, and carries it.</h2>
@@ -212,8 +214,8 @@
 <script src="app.js?v=16"></script>
 <script src="charts.js?v=8"></script>
 <script src="pipeline.js?v=33"></script>
-<script src="opening.js?v=38"></script>
+<script src="opening.js?v=41"></script>
 <script src="story.js?v=4"></script>
-<script src="stage.js?v=14"></script>
+<script src="stage.js?v=15"></script>
 </body>
 </html>
